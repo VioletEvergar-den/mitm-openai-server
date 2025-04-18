@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/llm-sec/mitm-openapi-server/pkg/api"
+	"github.com/llm-sec/mitm-openai-server/pkg/api"
 )
 
 func main() {
