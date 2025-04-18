@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -39,26 +40,22 @@ func NewServer(storage storage.Storage) *Server {
 // 返回:
 //   - *Server: 配置好的服务器实例
 func NewServerWithConfig(config ServerConfig) *Server {
-	// 如果启用生成UI认证凭证
-	if config.GenerateUIAuth {
-		if config.UIUsername == "" {
-			config.UIUsername = "admin" // 默认用户名
-		}
-		if config.UIPassword == "" {
-			config.UIPassword = generateRandomPassword(12) // 生成随机密码
-		}
-
-		// 在控制台打印UI认证凭证
-		fmt.Printf("\n==================================================\n")
-		fmt.Printf("前端UI访问凭证:\n")
-		fmt.Printf("用户名: %s\n", config.UIUsername)
-		fmt.Printf("密码: %s\n", config.UIPassword)
-		fmt.Printf("==================================================\n\n")
+	// 如果未设置存储，则返回错误
+	if config.Storage == nil {
+		log.Fatal("必须提供存储实例")
 	}
 
+	// 如果生成UI认证且没有设置密码，则生成随机密码
+	if config.GenerateUIAuth && config.UIPassword == "" {
+		config.UIPassword = generateRandomPassword(12)
+	}
+
+	// 创建默认路由
+	router := gin.Default()
+
 	// 创建服务器实例
-	s := &Server{
-		router:  gin.Default(), // 使用默认中间件的Gin路由引擎
+	server := &Server{
+		router:  router,
 		storage: config.Storage,
 		config:  config,
 	}
@@ -77,7 +74,7 @@ func NewServerWithConfig(config ServerConfig) *Server {
 			TargetPassword:  config.TargetPassword,
 			TargetToken:     config.TargetToken,
 		}
-		s.openaiService = openai.NewService(openaiConfig)
+		server.openaiService = openai.NewService(openaiConfig)
 	} else if !config.ProxyMode && config.EnableAuth {
 		// 创建带有API密钥验证的模拟服务
 		openaiConfig := openai.Config{
@@ -87,18 +84,20 @@ func NewServerWithConfig(config ServerConfig) *Server {
 			APIKey:          config.Token, // 使用同一个token作为API密钥
 			ProxyMode:       false,
 		}
-		s.openaiService = openai.NewService(openaiConfig)
+		server.openaiService = openai.NewService(openaiConfig)
 	} else {
 		// 创建不需要验证的模拟服务
 		openaiConfig := openai.DefaultConfig()
 		openaiConfig.APIKeyAuth = false
-		s.openaiService = openai.NewService(openaiConfig)
+		server.openaiService = openai.NewService(openaiConfig)
 	}
 
 	// 设置路由
-	s.setupRoutes()
+	server.setupRoutes()
+	server.setupUIRoutes()
+	server.setupOpenAIRoutes() // 设置OpenAI相关路由
 
-	return s
+	return server
 }
 
 // Run 启动服务器
@@ -231,37 +230,27 @@ func (s *Server) setupRoutes() {
 	})
 
 	// OpenAPI规范路由
-	s.router.GET("/openapi.json", s.ServeOpenAISpec)
+	s.router.GET("/openai.json", s.ServeOpenAISpec)
 
-	// UI路由
-	if s.config.UIDir != "" {
-		s.setupUIRoutes()
-	}
+	// 如果根路径访问，重定向到UI
+	s.router.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/ui/")
+	})
 
-	// OpenAI API代理路由
-	s.setupOpenAIRoutes()
+	// UI登录API端点
+	s.router.POST("/api/ui/login", s.handleUILogin)
 
-	// API路由组
+	// API路由组，有认证中间件保护
 	apiGroup := s.router.Group("/api")
 	apiGroup.Use(s.authMiddleware())
-	apiGroup.Use(s.apiMiddleware()) // 应用API中间件记录请求
+	apiGroup.Use(s.apiMiddleware())
 
-	// 获取所有记录的请求
+	// 请求管理路由
 	apiGroup.GET("/requests", s.getAllRequests)
-
-	// 获取单个请求
 	apiGroup.GET("/requests/:id", s.getRequestByID)
-
-	// 删除单个请求
 	apiGroup.DELETE("/requests/:id", s.deleteRequest)
-
-	// 删除所有请求
 	apiGroup.DELETE("/requests", s.deleteAllRequests)
-
-	// 导出请求为JSONL
 	apiGroup.GET("/export", s.exportRequests)
-
-	// 获取存储统计信息
 	apiGroup.GET("/stats", s.getStorageStats)
 
 	// v1 API组
@@ -284,32 +273,122 @@ func (s *Server) setupRoutes() {
 }
 
 // setupUIRoutes 设置UI相关的路由
-// 处理静态文件和基本认证
+// 处理静态文件和用户登录
 func (s *Server) setupUIRoutes() {
-	// 创建一个UI认证中间件
-	uiAuthMiddleware := func(c *gin.Context) {
-		// 如果用户名和密码都设置了，才启用认证
-		if s.config.UIUsername != "" && s.config.UIPassword != "" {
-			username, password, ok := c.Request.BasicAuth()
-			if !ok || username != s.config.UIUsername || password != s.config.UIPassword {
-				c.Header("WWW-Authenticate", "Basic realm=UI Access")
-				c.AbortWithStatus(http.StatusUnauthorized)
-				return
-			}
+	// 确保UI路径有效
+	uiPath := s.config.UIDir
+	if uiPath == "" {
+		uiPath = "./ui" // 默认UI目录
+	}
+
+	// UI API认证中间件
+	uiAuth := func(c *gin.Context) {
+		username, password, ok := c.Request.BasicAuth()
+		if !ok || username != s.config.UIUsername || password != s.config.UIPassword {
+			c.Header("WWW-Authenticate", "Basic realm=UI Access")
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
 		}
 		c.Next()
 	}
 
-	// 添加UI路由组，带有基本认证
-	uiGroup := s.router.Group("/ui")
-	uiGroup.Use(uiAuthMiddleware)
+	// 注册UI API路由
+	uiApiGroup := s.router.Group("/ui/api")
+	uiApiGroup.Use(uiAuth)
+	{
+		// 获取所有请求
+		uiApiGroup.GET("/requests", func(c *gin.Context) {
+			requests, err := s.storage.GetAllRequests(100, 0)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
 
-	// 提供静态文件
-	uiGroup.StaticFS("/", http.Dir(s.config.UIDir))
+			// 转换为服务器请求格式
+			serverRequests := make([]*Request, len(requests))
+			for i, req := range requests {
+				serverRequests[i] = convertStorageToServerRequest(req)
+			}
 
-	// 如果根路径访问，重定向到UI
-	s.router.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, "/ui/")
+			c.JSON(http.StatusOK, serverRequests)
+		})
+
+		// 获取单个请求详情
+		uiApiGroup.GET("/requests/:id", func(c *gin.Context) {
+			id := c.Param("id")
+			request, err := s.storage.GetRequestByID(id)
+			if err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "请求不存在"})
+				return
+			}
+			c.JSON(http.StatusOK, convertStorageToServerRequest(request))
+		})
+
+		// 删除单个请求
+		uiApiGroup.DELETE("/requests/:id", func(c *gin.Context) {
+			id := c.Param("id")
+			if err := s.storage.DeleteRequest(id); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"success": true})
+		})
+
+		// 获取服务器信息
+		uiApiGroup.GET("/server-info", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"version":     "1.0.0",
+				"apiBasePath": "/",
+				"openApiPath": "/openai.json",
+				"auth": gin.H{
+					"enabled": s.config.EnableAuth,
+					"type":    s.config.AuthType,
+				},
+				"proxy": gin.H{
+					"enabled":   s.config.ProxyMode,
+					"targetURL": s.config.TargetURL,
+				},
+			})
+		})
+
+		// 获取存储统计信息
+		uiApiGroup.GET("/storage-stats", func(c *gin.Context) {
+			stats, err := s.storage.GetStats()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, stats)
+		})
+
+		// 清空所有请求
+		uiApiGroup.DELETE("/requests", func(c *gin.Context) {
+			if err := s.storage.DeleteAllRequests(); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"success": true})
+		})
+	}
+
+	// 直接在主路由上注册UI路径处理程序
+	s.router.Use(func(c *gin.Context) {
+		path := c.Request.URL.Path
+		if strings.HasPrefix(path, "/ui/") || path == "/ui" {
+			// 如果路径结尾是/ui，重定向到/ui/
+			if path == "/ui" {
+				c.Redirect(http.StatusMovedPermanently, "/ui/")
+				c.Abort()
+				return
+			}
+
+			// 提供静态文件
+			fileServer := http.StripPrefix("/ui", http.FileServer(http.Dir(uiPath)))
+			fileServer.ServeHTTP(c.Writer, c.Request)
+			c.Abort()
+			return
+		}
+		c.Next()
 	})
 }
 
@@ -1269,4 +1348,53 @@ func generateRandomPassword(length int) string {
 	}
 
 	return string(password)
+}
+
+// GetConfig 返回服务器的配置
+// 获取当前服务器使用的配置信息
+// 返回:
+//   - ServerConfig: 服务器配置
+func (s *Server) GetConfig() ServerConfig {
+	return s.config
+}
+
+// handleUILogin 处理UI登录请求
+// 验证前端登录表单提交的用户名和密码
+// 参数:
+//   - c: Gin上下文
+func (s *Server) handleUILogin(c *gin.Context) {
+	// 定义请求体结构
+	var loginReq struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+
+	// 解析请求体
+	if err := c.ShouldBindJSON(&loginReq); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "无效的请求格式",
+		})
+		return
+	}
+
+	// 验证用户名和密码
+	if loginReq.Username == s.config.UIUsername && loginReq.Password == s.config.UIPassword {
+		// 登录成功，生成一个简单的会话令牌
+		// 实际应用中应使用更安全的会话管理
+		token := fmt.Sprintf("%s_%d", uuid.New().String(), time.Now().Unix())
+
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "success",
+			"message": "登录成功",
+			"token":   token,
+		})
+		return
+	}
+
+	// 登录失败
+	c.JSON(http.StatusUnauthorized, gin.H{
+		"status":  "error",
+		"message": "用户名或密码错误",
+	})
 }
