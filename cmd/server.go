@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gin-gonic/gin"
 	"github.com/llm-sec/mitm-openai-server/pkg/server"
 	"github.com/llm-sec/mitm-openai-server/pkg/storage"
 	"github.com/spf13/cobra"
@@ -97,6 +98,9 @@ func init() {
 }
 
 func runServer() {
+	// 设置Gin为发布模式，减少控制台输出
+	gin.SetMode(gin.ReleaseMode)
+
 	// 确保数据目录存在
 	absDataDir, err := filepath.Abs(dataDir)
 	if err != nil {
@@ -174,44 +178,76 @@ func runServer() {
 	// 创建并启动服务器
 	apiServer := server.NewServerWithConfig(config)
 
-	// 打印服务器信息
+	// 打印服务器信息(带颜色)
 	addr := fmt.Sprintf(":%d", port)
-	log.Printf("启动服务器，监听 %s", addr)
-	log.Printf("前端界面: http://localhost%s/ui/", addr)
-	log.Printf("OpenAPI规范: http://localhost%s/openapi.json", addr)
-	log.Printf("健康检查: http://localhost%s/health", addr)
-	log.Printf("API请求记录: http://localhost%s/api/requests", addr)
+
+	// 定义颜色代码
+	const (
+		colorReset  = "\033[0m"
+		colorRed    = "\033[31m"
+		colorGreen  = "\033[32m"
+		colorYellow = "\033[33m"
+		colorBlue   = "\033[34m"
+		colorPurple = "\033[35m"
+		colorCyan   = "\033[36m"
+		colorWhite  = "\033[37m"
+		colorBold   = "\033[1m"
+	)
+
+	fmt.Println()
+	fmt.Println(colorBold + "============= MITM OpenAI Server 已启动 =============" + colorReset)
+	fmt.Printf("%s服务器地址:%s http://localhost%s %s\n", colorBold, colorReset, addr, colorCyan+"(监听所有网络接口)"+colorReset)
+	fmt.Println()
+
+	fmt.Printf("%s前端界面:%s     %shttp://localhost%s/ui/%s\n", colorBold, colorReset, colorGreen, addr, colorReset)
+	fmt.Printf("%sOpenAI API规范:%s %shttp://localhost%s/openai.json%s\n", colorBold, colorReset, colorGreen, addr, colorReset)
+	fmt.Printf("%s健康检查:%s     %shttp://localhost%s/health%s\n", colorBold, colorReset, colorGreen, addr, colorReset)
+	fmt.Printf("%sAPI请求记录:%s   %shttp://localhost%s/api/requests%s\n", colorBold, colorReset, colorGreen, addr, colorReset)
+
+	// 打印UI凭证(如果有)
+	if generateUIAuth {
+		// 获取UI配置
+		serverConfig := apiServer.GetConfig()
+
+		fmt.Println()
+		fmt.Println(colorBold + colorYellow + "============= 前端UI访问凭证 =============" + colorReset)
+		fmt.Printf("%s用户名:%s %s%s%s\n", colorBold, colorReset, colorPurple, serverConfig.UIUsername, colorReset)
+		fmt.Printf("%s密码:%s   %s%s%s\n", colorBold, colorReset, colorPurple, serverConfig.UIPassword, colorReset)
+		fmt.Println(colorBold + colorYellow + "=========================================" + colorReset)
+		fmt.Println()
+	}
 
 	// 认证配置信息
 	if enableAuth {
 		switch authType {
 		case "basic":
-			log.Printf("已启用基本认证 (用户名: %s)", authUsername)
+			fmt.Printf("%s已启用API基本认证%s (用户名: %s%s%s)\n", colorBlue, colorReset, colorPurple, authUsername, colorReset)
 		case "token":
-			log.Printf("已启用令牌认证")
+			fmt.Printf("%s已启用API令牌认证%s\n", colorBlue, colorReset)
 		default:
-			log.Printf("已启用认证，类型: %s", authType)
+			fmt.Printf("%s已启用API认证%s，类型: %s\n", colorBlue, colorReset, authType)
 		}
 	} else {
-		log.Printf("认证已禁用")
+		fmt.Printf("%sAPI认证已禁用%s\n", colorRed, colorReset)
 	}
 
 	// 代理模式信息
 	if proxyMode {
 		if targetURL == "" {
-			log.Printf("警告: 代理模式已启用，但未指定目标URL，将使用模拟响应")
+			fmt.Printf("%s警告: 代理模式已启用，但未指定目标URL，将使用模拟响应%s\n", colorRed, colorReset)
 		} else {
-			log.Printf("代理模式已启用，目标: %s", targetURL)
+			fmt.Printf("%s代理模式已启用%s，目标: %s%s%s\n", colorGreen, colorReset, colorCyan, targetURL, colorReset)
 
 			if targetAuthType != "none" {
-				log.Printf("目标API认证类型: %s", targetAuthType)
+				fmt.Printf("%s目标API认证类型:%s %s\n", colorBlue, colorReset, targetAuthType)
 			} else {
-				log.Printf("目标API认证已禁用")
+				fmt.Printf("%s目标API认证已禁用%s\n", colorRed, colorReset)
 			}
 		}
 	} else {
-		log.Printf("独立模式，使用模拟响应")
+		fmt.Printf("%s独立模式%s，使用模拟响应\n", colorGreen, colorReset)
 	}
+	fmt.Println()
 
 	if err := apiServer.Run(addr); err != nil {
 		log.Fatalf("服务器启动失败: %v", err)
