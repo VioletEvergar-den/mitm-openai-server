@@ -10,6 +10,14 @@ type Request struct {
 	Query     map[string]string `json:"query"`
 	Body      interface{}       `json:"body,omitempty"`
 	IPAddress string            `json:"ip_address"`
+	Response  *ProxyResponse    `json:"response,omitempty"`
+}
+
+// ProxyResponse 表示从目标API获取的响应
+type ProxyResponse struct {
+	StatusCode int               `json:"status_code"`
+	Headers    map[string]string `json:"headers"`
+	Body       interface{}       `json:"body,omitempty"`
 }
 
 // StandardResponse 表示API返回的标准响应
