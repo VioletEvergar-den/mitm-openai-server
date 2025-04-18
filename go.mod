@@ -1,4 +1,4 @@
-module github.com/llm-sec/mitm-openapi-server
+module github.com/llm-sec/mitm-openai-server
 
 go 1.20
 
