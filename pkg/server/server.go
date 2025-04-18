@@ -13,11 +13,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/llm-sec/mitm-openai-server/pkg/openai"
 	"github.com/llm-sec/mitm-openai-server/pkg/storage"
 	"github.com/llm-sec/mitm-openai-server/pkg/utils"
 )
 
 // NewServer 创建一个新的服务器实例
+// 使用默认配置创建服务器，只需提供存储接口
+// 参数:
+//   - storage: 用于存储请求数据的存储接口
+//
+// 返回:
+//   - *Server: 服务器实例
 func NewServer(storage storage.Storage) *Server {
 	return NewServerWithConfig(ServerConfig{
 		Storage: storage,
@@ -25,14 +32,20 @@ func NewServer(storage storage.Storage) *Server {
 }
 
 // NewServerWithConfig 使用配置创建一个新的服务器实例
+// 允许通过ServerConfig结构体提供详细配置
+// 参数:
+//   - config: 服务器配置
+//
+// 返回:
+//   - *Server: 配置好的服务器实例
 func NewServerWithConfig(config ServerConfig) *Server {
 	// 如果启用生成UI认证凭证
 	if config.GenerateUIAuth {
 		if config.UIUsername == "" {
-			config.UIUsername = "admin"
+			config.UIUsername = "admin" // 默认用户名
 		}
 		if config.UIPassword == "" {
-			config.UIPassword = generateRandomPassword(12)
+			config.UIPassword = generateRandomPassword(12) // 生成随机密码
 		}
 
 		// 在控制台打印UI认证凭证
@@ -43,21 +56,66 @@ func NewServerWithConfig(config ServerConfig) *Server {
 		fmt.Printf("==================================================\n\n")
 	}
 
+	// 创建服务器实例
 	s := &Server{
-		router:  gin.Default(),
+		router:  gin.Default(), // 使用默认中间件的Gin路由引擎
 		storage: config.Storage,
 		config:  config,
 	}
+
+	// 初始化OpenAI服务
+	if config.ProxyMode {
+		// 创建OpenAI服务配置
+		openaiConfig := openai.Config{
+			Enabled:         true,
+			ResponseDelayMs: 0,     // 在代理模式下不添加额外延迟
+			APIKeyAuth:      false, // 不在服务器端验证API密钥
+			ProxyMode:       true,
+			TargetURL:       config.TargetURL,
+			TargetAuthType:  config.TargetAuthType,
+			TargetUsername:  config.TargetUsername,
+			TargetPassword:  config.TargetPassword,
+			TargetToken:     config.TargetToken,
+		}
+		s.openaiService = openai.NewService(openaiConfig)
+	} else if !config.ProxyMode && config.EnableAuth {
+		// 创建带有API密钥验证的模拟服务
+		openaiConfig := openai.Config{
+			Enabled:         true,
+			ResponseDelayMs: 100, // 添加一些响应延迟以模拟真实API
+			APIKeyAuth:      true,
+			APIKey:          config.Token, // 使用同一个token作为API密钥
+			ProxyMode:       false,
+		}
+		s.openaiService = openai.NewService(openaiConfig)
+	} else {
+		// 创建不需要验证的模拟服务
+		openaiConfig := openai.DefaultConfig()
+		openaiConfig.APIKeyAuth = false
+		s.openaiService = openai.NewService(openaiConfig)
+	}
+
+	// 设置路由
 	s.setupRoutes()
+
 	return s
 }
 
 // Run 启动服务器
+// 在指定地址上启动HTTP服务器
+// 参数:
+//   - addr: 服务器监听地址，格式为"host:port"
+//
+// 返回:
+//   - error: 如果服务器启动失败，返回错误
 func (s *Server) Run(addr string) error {
 	return s.router.Run(addr)
 }
 
-// 认证中间件
+// authMiddleware 认证中间件
+// 提供API认证功能，支持basic和token两种认证方式
+// 返回:
+//   - gin.HandlerFunc: Gin中间件函数
 func (s *Server) authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 如果认证被禁用，则跳过
@@ -66,11 +124,12 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// 根据配置的认证类型进行认证
 		var authorized bool
 		switch s.config.AuthType {
-		case "basic":
+		case "basic": // 基本认证
 			authorized = s.validateBasicAuth(c)
-		case "token":
+		case "token": // 令牌认证
 			authorized = s.validateTokenAuth(c)
 		default:
 			// 不支持的认证类型，拒绝访问
@@ -82,6 +141,7 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// 认证失败，返回401状态码
 		if !authorized {
 			c.JSON(http.StatusUnauthorized, StandardResponse{
 				Status:  "error",
@@ -91,40 +151,57 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// 认证成功，继续处理请求
 		c.Next()
 	}
 }
 
-// 验证基本认证
+// validateBasicAuth 验证基本认证
+// 检查HTTP Basic认证的用户名和密码是否匹配配置
+// 参数:
+//   - c: Gin上下文
+//
+// 返回:
+//   - bool: 认证是否成功
 func (s *Server) validateBasicAuth(c *gin.Context) bool {
 	username, password, ok := c.Request.BasicAuth()
 	if !ok {
-		return false
+		return false // 没有提供认证信息
 	}
 
 	return username == s.config.Username && password == s.config.Password
 }
 
-// 验证令牌认证
+// validateTokenAuth 验证令牌认证
+// 检查Authorization头中的令牌是否匹配配置
+// 参数:
+//   - c: Gin上下文
+//
+// 返回:
+//   - bool: 认证是否成功
 func (s *Server) validateTokenAuth(c *gin.Context) bool {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
-		return false
+		return false // 没有提供认证头
 	}
 
 	// 支持"Bearer token"格式和直接的令牌格式
 	token := authHeader
 	if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
-		token = authHeader[7:]
+		token = authHeader[7:] // 去掉"Bearer "前缀
 	}
 
 	return token == s.config.Token
 }
 
-// CORS中间件
+// corsMiddleware CORS中间件
+// 处理跨域资源共享，允许来自不同域的请求
+// 返回:
+//   - gin.HandlerFunc: Gin中间件函数
 func (s *Server) corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if s.config.EnableCORS {
+			// 设置CORS相关的HTTP头
 			c.Writer.Header().Set("Access-Control-Allow-Origin", s.config.AllowOrigins)
 			c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
 			c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
@@ -132,7 +209,7 @@ func (s *Server) corsMiddleware() gin.HandlerFunc {
 
 			// 处理预检请求
 			if c.Request.Method == "OPTIONS" {
-				c.AbortWithStatus(http.StatusNoContent)
+				c.AbortWithStatus(http.StatusNoContent) // 返回204状态码
 				return
 			}
 		}
@@ -140,51 +217,56 @@ func (s *Server) corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-// setupRoutes 设置所有路由
+// setupRoutes 配置服务器的所有HTTP路由和中间件
+// 设置HTTP路由处理程序，包括API路由、认证中间件和CORS中间件
 func (s *Server) setupRoutes() {
-	// 添加CORS中间件
+	// 设置全局中间件
+	s.router.Use(gin.Logger())
+	s.router.Use(gin.Recovery())
 	s.router.Use(s.corsMiddleware())
 
-	// 健康检查 - 不需要认证
+	// 健康检查路由
 	s.router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	// 前端静态文件 - 不需要API认证，但有自己的认证
-	s.setupUIRoutes()
+	// OpenAPI规范路由
+	s.router.GET("/openapi.json", s.ServeOpenAISpec)
 
-	// OpenAPI规范 - 不需要认证
-	s.router.GET("/openapi.json", s.ServeOpenAPISpec)
-	s.router.GET("/v1/openapi.json", s.ServeOpenAPISpec)
-	s.router.GET("/v2/openapi.json", s.ServeOpenAPISpec)
+	// UI路由
+	if s.config.UIDir != "" {
+		s.setupUIRoutes()
+	}
 
-	// API请求 - 需要认证
-	apiGroup := s.router.Group("/")
-	apiGroup.Use(s.authMiddleware()) // 应用认证中间件
-	apiGroup.Use(s.apiMiddleware())  // 应用API中间件记录请求
+	// OpenAI API代理路由
+	s.setupOpenAIRoutes()
+
+	// API路由组
+	apiGroup := s.router.Group("/api")
+	apiGroup.Use(s.authMiddleware())
+	apiGroup.Use(s.apiMiddleware()) // 应用API中间件记录请求
 
 	// 获取所有记录的请求
-	apiGroup.GET("/api/requests", s.getAllRequests)
+	apiGroup.GET("/requests", s.getAllRequests)
 
 	// 获取单个请求
-	apiGroup.GET("/api/requests/:id", s.getRequestByID)
+	apiGroup.GET("/requests/:id", s.getRequestByID)
 
 	// 删除单个请求
-	apiGroup.DELETE("/api/requests/:id", s.deleteRequest)
+	apiGroup.DELETE("/requests/:id", s.deleteRequest)
 
 	// 删除所有请求
-	apiGroup.DELETE("/api/requests", s.deleteAllRequests)
+	apiGroup.DELETE("/requests", s.deleteAllRequests)
 
 	// 导出请求为JSONL
-	apiGroup.GET("/api/export", s.exportRequests)
+	apiGroup.GET("/export", s.exportRequests)
 
 	// 获取存储统计信息
-	apiGroup.GET("/api/stats", s.getStorageStats)
+	apiGroup.GET("/stats", s.getStorageStats)
 
 	// v1 API组
 	v1 := apiGroup.Group("/v1")
 	{
-		// 在这里添加你的v1 API路由
 		v1.GET("/users", s.handleV1Users)
 		v1.POST("/users", s.handleV1CreateUser)
 		v1.GET("/users/:id", s.handleV1UserByID)
@@ -194,7 +276,6 @@ func (s *Server) setupRoutes() {
 	// v2 API组
 	v2 := apiGroup.Group("/v2")
 	{
-		// 在这里添加你的v2 API路由
 		v2.GET("/users", s.handleV2Users)
 		v2.POST("/users", s.handleV2CreateUser)
 		v2.GET("/users/:id", s.handleV2UserByID)
@@ -202,198 +283,383 @@ func (s *Server) setupRoutes() {
 	}
 }
 
-// apiMiddleware API中间件，记录API调用
-func (s *Server) apiMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// 跳过OpenAPI规范和内部API请求
-		path := c.Request.URL.Path
-		if strings.HasSuffix(path, "/openapi.json") ||
-			strings.HasPrefix(path, "/api/") ||
-			path == "/health" {
-			c.Next()
+// setupUIRoutes 设置UI相关的路由
+// 处理静态文件和基本认证
+func (s *Server) setupUIRoutes() {
+	// 创建一个UI认证中间件
+	uiAuthMiddleware := func(c *gin.Context) {
+		// 如果用户名和密码都设置了，才启用认证
+		if s.config.UIUsername != "" && s.config.UIPassword != "" {
+			username, password, ok := c.Request.BasicAuth()
+			if !ok || username != s.config.UIUsername || password != s.config.UIPassword {
+				c.Header("WWW-Authenticate", "Basic realm=UI Access")
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+		}
+		c.Next()
+	}
+
+	// 添加UI路由组，带有基本认证
+	uiGroup := s.router.Group("/ui")
+	uiGroup.Use(uiAuthMiddleware)
+
+	// 提供静态文件
+	uiGroup.StaticFS("/", http.Dir(s.config.UIDir))
+
+	// 如果根路径访问，重定向到UI
+	s.router.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/ui/")
+	})
+}
+
+// setupOpenAIRoutes 设置OpenAI API代理路由
+// 配置所有与OpenAI API相关的路由
+func (s *Server) setupOpenAIRoutes() {
+	// 如果没有初始化openaiService，跳过设置OpenAI路由
+	if s.openaiService == nil {
+		return
+	}
+
+	// OpenAI API路由组
+	openaiGroup := s.router.Group("/v1")
+
+	// 应用API中间件记录请求
+	openaiGroup.Use(s.apiMiddleware())
+
+	// 处理所有请求
+	openaiGroup.Any("/*path", s.handleOpenAIRequest)
+}
+
+// handleOpenAIRequest 处理OpenAI API请求
+// 根据配置，将请求代理到真实API或返回模拟响应
+// 参数:
+//   - c: Gin上下文
+func (s *Server) handleOpenAIRequest(c *gin.Context) {
+	// 获取请求方法和路径
+	method := c.Request.Method
+	path := c.Param("path")
+
+	// 读取请求体
+	var bodyBytes []byte
+	var err error
+	if c.Request.Body != nil {
+		bodyBytes, err = io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": map[string]interface{}{
+					"message": "无法读取请求体: " + err.Error(),
+					"type":    "server_error",
+					"code":    "internal_server_error",
+				},
+			})
 			return
 		}
+		// 恢复请求体，以便其他中间件可以再次读取
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	}
 
-		// 创建请求记录
-		req := &Request{
-			ID:        uuid.New().String(),
-			Timestamp: time.Now().Format(time.RFC3339),
-			Method:    c.Request.Method,
-			Path:      path,
-			Headers:   make(map[string]string),
-			Query:     make(map[string]string),
-			IPAddress: c.ClientIP(),
+	// 收集请求头
+	headers := make(map[string]string)
+	for key, values := range c.Request.Header {
+		if len(values) > 0 {
+			headers[key] = values[0]
 		}
+	}
 
-		// 获取请求头
-		for k, v := range c.Request.Header {
-			if len(v) > 0 {
-				req.Headers[k] = v[0]
-			}
+	// 收集查询参数
+	queryParams := make(map[string]string)
+	for key, values := range c.Request.URL.Query() {
+		if len(values) > 0 {
+			queryParams[key] = values[0]
 		}
+	}
 
-		// 获取查询参数
+	// 使用OpenAI服务处理请求
+	statusCode, responseHeaders, responseBody, err := s.openaiService.HandleRequest(
+		method, path, headers, queryParams, bodyBytes,
+	)
+
+	if err != nil {
+		// 发生错误，返回错误响应
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": map[string]interface{}{
+				"message": "处理请求失败: " + err.Error(),
+				"type":    "server_error",
+				"code":    "internal_server_error",
+			},
+		})
+		return
+	}
+
+	// 设置响应头
+	for key, value := range responseHeaders {
+		c.Header(key, value)
+	}
+
+	// 返回响应
+	c.JSON(statusCode, responseBody)
+}
+
+// apiMiddleware API中间件
+// 记录所有API请求，包括请求和响应数据
+// 返回:
+//   - gin.HandlerFunc: Gin中间件函数
+func (s *Server) apiMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 获取请求开始时间
+		startTime := time.Now()
+
+		// 获取客户端IP
+		clientIP := c.ClientIP()
+
+		// 捕获请求
+		requestID := uuid.New().String()
+		method := c.Request.Method
+		path := c.Request.URL.Path
+		query := make(map[string][]string)
+
+		// 复制URL查询参数
 		for k, v := range c.Request.URL.Query() {
-			if len(v) > 0 {
-				req.Query[k] = v[0]
-			}
+			query[k] = v
 		}
 
-		// 获取请求体
+		// 复制请求头
+		headers := make(map[string][]string)
+		for k, v := range c.Request.Header {
+			headers[k] = v
+		}
+
+		// 读取请求体
 		var bodyBytes []byte
-		var body interface{}
+		var err error
 
 		if c.Request.Body != nil {
-			bodyBytes, _ = io.ReadAll(c.Request.Body)
-			// 重新设置请求体，因为读取后Body会被消耗
-			c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
-			// 尝试解析JSON
-			if len(bodyBytes) > 0 {
-				if err := json.Unmarshal(bodyBytes, &body); err == nil {
-					req.Body = body
-				}
-			}
-		}
-
-		// 设置请求ID和时间戳
-		c.Set("request_id", req.ID)
-		c.Set("request_timestamp", req.Timestamp)
-
-		// 在代理模式下，转发请求到目标API
-		if s.config.ProxyMode && s.config.TargetURL != "" {
-			// 调用代理函数
-			proxyRespMap, err := utils.SendProxyRequest(
-				c.Request.Method,
-				s.config.TargetURL,
-				path,
-				req.Headers,
-				bodyBytes,
-				s.config.TargetAuthType,
-				s.config.TargetUsername,
-				s.config.TargetPassword,
-				s.config.TargetToken,
-			)
-
+			bodyBytes, err = io.ReadAll(c.Request.Body)
 			if err != nil {
-				// 代理请求失败，返回错误信息
-				c.JSON(http.StatusBadGateway, StandardResponse{
+				// 如果读取失败，记录错误并继续
+				c.JSON(http.StatusInternalServerError, StandardResponse{
 					Status:  "error",
-					Message: "代理请求失败: " + err.Error(),
+					Message: "无法读取请求体: " + err.Error(),
 				})
-
-				// 记录失败的请求
-				req.Response = &ProxyResponse{
-					StatusCode: http.StatusBadGateway,
-					Headers:    map[string]string{"Content-Type": "application/json"},
-					Body: map[string]interface{}{
-						"status":  "error",
-						"message": "代理请求失败: " + err.Error(),
-					},
-				}
-
-				if err := s.saveRequest(req); err != nil {
-					fmt.Printf("保存请求记录失败: %v\n", err)
-				}
-
 				c.Abort()
 				return
 			}
 
-			// 转换并记录代理响应
-			proxyResp := &ProxyResponse{
-				StatusCode: proxyRespMap["status_code"].(int),
-				Headers:    proxyRespMap["headers"].(map[string]string),
-				Body:       proxyRespMap["body"],
-			}
-			req.Response = proxyResp
-
-			// 保存请求记录
-			if err := s.saveRequest(req); err != nil {
-				fmt.Printf("保存请求记录失败: %v\n", err)
-			}
-
-			// 设置响应状态码
-			c.Status(proxyResp.StatusCode)
-
-			// 转发响应头
-			for k, v := range proxyResp.Headers {
-				// 避免设置一些特定的头，这些头由Gin框架处理
-				if strings.ToLower(k) != "content-length" {
-					c.Header(k, v)
-				}
-			}
-
-			// 返回代理响应体
-			if proxyResp.Body != nil {
-				switch body := proxyResp.Body.(type) {
-				case string:
-					c.String(proxyResp.StatusCode, body)
-				default:
-					c.JSON(proxyResp.StatusCode, body)
-				}
-			}
-
-			c.Abort() // 终止后续处理
-			return
+			// 恢复请求体，以便后续处理程序可以再次读取
+			c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
 
-		// 在非代理模式下，保存请求继续处理
-		if err := s.saveRequest(req); err != nil {
-			c.JSON(http.StatusInternalServerError, StandardResponse{
-				Status:  "error",
-				Message: "保存请求记录失败: " + err.Error(),
-			})
-			c.Abort()
-			return
+		// 解析请求体为JSON（如果可能）
+		var bodyData interface{}
+		if len(bodyBytes) > 0 {
+			contentType := c.GetHeader("Content-Type")
+			if strings.Contains(contentType, "application/json") {
+				// 尝试解析JSON
+				if err := json.Unmarshal(bodyBytes, &bodyData); err != nil {
+					// 如果解析失败，使用原始字符串
+					bodyData = string(bodyBytes)
+				}
+			} else {
+				// 非JSON内容，使用原始字符串
+				bodyData = string(bodyBytes)
+			}
 		}
 
-		c.Next() // 继续处理请求
+		// 创建一个响应记录器来捕获响应
+		responseRecorder := utils.NewResponseRecorder(c.Writer)
+		c.Writer = responseRecorder
+
+		// 处理请求，这将调用下一个中间件或路由处理程序
+		c.Next()
+
+		// 计算请求处理时间
+		latency := time.Since(startTime).Milliseconds()
+
+		// 捕获响应数据
+		statusCode := responseRecorder.Status()
+		responseHeaders := responseRecorder.Header()
+		responseBodyBytes := responseRecorder.Body.Bytes()
+
+		// 解析响应体为JSON（如果可能）
+		var responseBody interface{}
+		if len(responseBodyBytes) > 0 {
+			contentType := responseHeaders.Get("Content-Type")
+			if strings.Contains(contentType, "application/json") {
+				// 尝试解析JSON
+				if err := json.Unmarshal(responseBodyBytes, &responseBody); err != nil {
+					// 如果解析失败，使用原始字符串
+					responseBody = string(responseBodyBytes)
+				}
+			} else {
+				// 非JSON内容，使用原始字符串
+				responseBody = string(responseBodyBytes)
+			}
+		}
+
+		// 创建响应对象
+		response := &storage.ProxyResponse{
+			StatusCode: statusCode,
+			Headers:    responseHeaders,
+			Body:       responseBody,
+			Latency:    latency,
+		}
+
+		// 创建请求记录
+		request := &storage.Request{
+			ID:        requestID,
+			Method:    method,
+			Path:      path,
+			Timestamp: time.Now(),
+			Headers:   headers,
+			Query:     query,
+			Body:      bodyData,
+			ClientIP:  clientIP,
+			Response:  response,
+			Metadata: map[string]interface{}{
+				"latency_ms": latency,
+			},
+		}
+
+		// 保存请求到存储
+		if err := s.storage.SaveRequest(request); err != nil {
+			// 记录错误，但不中断请求处理
+			fmt.Printf("无法保存请求: %v\n", err)
+		}
 	}
 }
 
-// 将请求记录保存到存储中
+// saveRequest 保存请求到存储
+// 将服务器请求模型转换为存储请求模型并保存
+// 参数:
+//   - req: 要保存的请求
+//
+// 返回:
+//   - error: 如果保存失败，返回错误
 func (s *Server) saveRequest(req *Request) error {
-	// 转换Request为storage.Request
+	// 转换服务器请求模型为存储请求模型
 	storageReq := &storage.Request{
 		ID:        req.ID,
-		Timestamp: req.Timestamp,
 		Method:    req.Method,
 		Path:      req.Path,
-		Headers:   req.Headers,
-		Query:     req.Query,
-		Body:      req.Body,
-		IPAddress: req.IPAddress,
+		Timestamp: req.Timestamp,
+		ClientIP:  req.IPAddress,
 	}
 
+	// 转换Headers（从map[string]string到map[string][]string）
+	headers := make(map[string][]string)
+	for k, v := range req.Headers {
+		headers[k] = []string{v}
+	}
+	storageReq.Headers = headers
+
+	// 转换Query（从map[string]string到map[string][]string）
+	query := make(map[string][]string)
+	for k, v := range req.Query {
+		query[k] = []string{v}
+	}
+	storageReq.Query = query
+
+	// 设置请求体
+	storageReq.Body = req.Body
+
+	// 如果有响应，也转换响应
 	if req.Response != nil {
+		// 转换响应头
+		respHeaders := make(map[string][]string)
+		for k, v := range req.Response.Headers {
+			respHeaders[k] = []string{v}
+		}
+
 		storageReq.Response = &storage.ProxyResponse{
 			StatusCode: req.Response.StatusCode,
-			Headers:    req.Response.Headers,
+			Headers:    respHeaders,
 			Body:       req.Response.Body,
 		}
 	}
 
+	// 保存到存储
 	return s.storage.SaveRequest(storageReq)
 }
 
-// 从storage.Request转换为server.Request
+// convertStorageToServerRequest 将存储请求模型转换为服务器请求模型
+// 参数:
+//   - req: 存储请求模型
+//
+// 返回:
+//   - *Request: 服务器请求模型
 func convertStorageToServerRequest(req *storage.Request) *Request {
+	// 创建服务器请求模型
 	serverReq := &Request{
-		ID:        req.ID,
-		Timestamp: req.Timestamp.(string),
-		Method:    req.Method,
-		Path:      req.Path,
-		Headers:   req.Headers.(map[string]string),
-		Query:     req.Query.(map[string]string),
-		Body:      req.Body,
-		IPAddress: req.IPAddress,
+		ID:     req.ID,
+		Method: req.Method,
+		Path:   req.Path,
+		Body:   req.Body,
 	}
 
+	// 处理时间戳
+	switch ts := req.Timestamp.(type) {
+	case string:
+		serverReq.Timestamp = ts
+	case time.Time:
+		serverReq.Timestamp = ts.Format(time.RFC3339)
+	default:
+		// 如果无法识别时间戳类型，使用当前时间
+		serverReq.Timestamp = time.Now().Format(time.RFC3339)
+	}
+
+	// 处理IP地址（兼容两个字段）
+	if req.ClientIP != "" {
+		serverReq.IPAddress = req.ClientIP
+	} else {
+		serverReq.IPAddress = req.IPAddress
+	}
+
+	// 转换Headers
+	serverReq.Headers = make(map[string]string)
+	switch headers := req.Headers.(type) {
+	case map[string][]string:
+		for k, v := range headers {
+			if len(v) > 0 {
+				serverReq.Headers[k] = v[0]
+			}
+		}
+	case map[string]string:
+		serverReq.Headers = headers
+	}
+
+	// 转换Query
+	serverReq.Query = make(map[string]string)
+	switch query := req.Query.(type) {
+	case map[string][]string:
+		for k, v := range query {
+			if len(v) > 0 {
+				serverReq.Query[k] = v[0]
+			}
+		}
+	case map[string]string:
+		serverReq.Query = query
+	}
+
+	// 转换Response（如果存在）
 	if req.Response != nil {
+		respHeaders := make(map[string]string)
+
+		// 转换响应头
+		switch headers := req.Response.Headers.(type) {
+		case map[string][]string:
+			for k, v := range headers {
+				if len(v) > 0 {
+					respHeaders[k] = v[0]
+				}
+			}
+		case map[string]string:
+			respHeaders = headers
+		}
+
 		serverReq.Response = &ProxyResponse{
 			StatusCode: req.Response.StatusCode,
-			Headers:    req.Response.Headers.(map[string]string),
+			Headers:    respHeaders,
 			Body:       req.Response.Body,
 		}
 	}
@@ -401,23 +667,35 @@ func convertStorageToServerRequest(req *storage.Request) *Request {
 	return serverReq
 }
 
-// getAllRequests 处理获取所有请求的API
+// getAllRequests 获取所有记录的请求
+// 处理GET /api/requests请求，支持分页查询
+// 参数:
+//   - c: Gin上下文
 func (s *Server) getAllRequests(c *gin.Context) {
 	// 获取分页参数
-	limit := 100 // 默认每页100条
-	offset := 0  // 默认从0开始
+	limit := 20 // 默认每页20条
+	offset := 0 // 默认从0开始
 
+	// 解析查询参数
 	limitParam := c.Query("limit")
 	offsetParam := c.Query("offset")
 
+	// 转换限制参数
 	if limitParam != "" {
-		fmt.Sscanf(limitParam, "%d", &limit)
-	}
-	if offsetParam != "" {
-		fmt.Sscanf(offsetParam, "%d", &offset)
+		if _, err := fmt.Sscanf(limitParam, "%d", &limit); err != nil {
+			limit = 20 // 参数无效时使用默认值
+		}
 	}
 
-	reqs, err := s.storage.GetAllRequests(limit, offset)
+	// 转换偏移参数
+	if offsetParam != "" {
+		if _, err := fmt.Sscanf(offsetParam, "%d", &offset); err != nil {
+			offset = 0 // 参数无效时使用默认值
+		}
+	}
+
+	// 从存储中获取请求
+	requests, err := s.storage.GetAllRequests(limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, StandardResponse{
 			Status:  "error",
@@ -426,21 +704,37 @@ func (s *Server) getAllRequests(c *gin.Context) {
 		return
 	}
 
-	// 转换为server.Request列表
-	serverReqs := make([]*Request, len(reqs))
-	for i, req := range reqs {
-		serverReqs[i] = convertStorageToServerRequest(req)
+	// 转换为服务器请求模型
+	var serverRequests []*Request
+	for _, req := range requests {
+		serverReq := convertStorageToServerRequest(req)
+		serverRequests = append(serverRequests, serverReq)
 	}
 
+	// 返回请求列表
 	c.JSON(http.StatusOK, StandardResponse{
-		Status: "success",
-		Data:   serverReqs,
+		Status:  "success",
+		Message: fmt.Sprintf("找到 %d 个请求", len(serverRequests)),
+		Data:    serverRequests,
 	})
 }
 
-// getRequestByID 处理根据ID获取请求的API
+// getRequestByID 获取特定ID的请求
+// 处理GET /api/requests/:id请求
+// 参数:
+//   - c: Gin上下文
 func (s *Server) getRequestByID(c *gin.Context) {
+	// 获取请求ID
 	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, StandardResponse{
+			Status:  "error",
+			Message: "请求ID不能为空",
+		})
+		return
+	}
+
+	// 从存储中获取请求
 	req, err := s.storage.GetRequestByID(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, StandardResponse{
@@ -450,32 +744,60 @@ func (s *Server) getRequestByID(c *gin.Context) {
 		return
 	}
 
+	// 转换为服务器请求模型
+	serverReq := convertStorageToServerRequest(req)
+
+	// 返回请求详情
 	c.JSON(http.StatusOK, StandardResponse{
-		Status: "success",
-		Data:   convertStorageToServerRequest(req),
+		Status:  "success",
+		Message: "请求获取成功",
+		Data:    serverReq,
 	})
 }
 
-// deleteRequest 删除单个请求
+// deleteRequest 删除特定ID的请求
+// 处理DELETE /api/requests/:id请求
+// 参数:
+//   - c: Gin上下文
 func (s *Server) deleteRequest(c *gin.Context) {
+	// 获取请求ID
 	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, StandardResponse{
+			Status:  "error",
+			Message: "请求ID不能为空",
+		})
+		return
+	}
+
+	// 从存储中删除请求
 	err := s.storage.DeleteRequest(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, StandardResponse{
+		statusCode := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "不存在") {
+			statusCode = http.StatusNotFound
+		}
+
+		c.JSON(statusCode, StandardResponse{
 			Status:  "error",
 			Message: "删除请求失败: " + err.Error(),
 		})
 		return
 	}
 
+	// 返回成功响应
 	c.JSON(http.StatusOK, StandardResponse{
 		Status:  "success",
-		Message: "请求已删除",
+		Message: "请求已成功删除",
 	})
 }
 
 // deleteAllRequests 删除所有请求
+// 处理DELETE /api/requests请求
+// 参数:
+//   - c: Gin上下文
 func (s *Server) deleteAllRequests(c *gin.Context) {
+	// 从存储中删除所有请求
 	err := s.storage.DeleteAllRequests()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, StandardResponse{
@@ -485,14 +807,19 @@ func (s *Server) deleteAllRequests(c *gin.Context) {
 		return
 	}
 
+	// 返回成功响应
 	c.JSON(http.StatusOK, StandardResponse{
 		Status:  "success",
-		Message: "所有请求已删除",
+		Message: "所有请求已成功删除",
 	})
 }
 
-// exportRequests 导出请求为JSONL
+// exportRequests 导出请求为JSONL格式
+// 处理GET /api/export请求
+// 参数:
+//   - c: Gin上下文
 func (s *Server) exportRequests(c *gin.Context) {
+	// 从存储中导出请求
 	filePath, err := s.storage.ExportRequests()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, StandardResponse{
@@ -502,14 +829,22 @@ func (s *Server) exportRequests(c *gin.Context) {
 		return
 	}
 
-	// 设置文件下载头
-	c.Header("Content-Disposition", "attachment; filename=requests.jsonl")
-	c.Header("Content-Type", "application/jsonl")
-	c.File(filePath)
+	// 返回导出文件路径
+	c.JSON(http.StatusOK, StandardResponse{
+		Status:  "success",
+		Message: "请求已成功导出",
+		Data: map[string]string{
+			"file_path": filePath,
+		},
+	})
 }
 
 // getStorageStats 获取存储统计信息
+// 处理GET /api/stats请求
+// 参数:
+//   - c: Gin上下文
 func (s *Server) getStorageStats(c *gin.Context) {
+	// 从存储中获取统计信息
 	stats, err := s.storage.GetStats()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, StandardResponse{
@@ -519,147 +854,419 @@ func (s *Server) getStorageStats(c *gin.Context) {
 		return
 	}
 
+	// 返回统计信息
 	c.JSON(http.StatusOK, StandardResponse{
-		Status: "success",
-		Data:   stats,
+		Status:  "success",
+		Message: "存储统计获取成功",
+		Data:    stats,
 	})
 }
 
-// handleV1Users 处理v1版本获取用户列表的API
+// handleV1Users 处理V1版本用户列表请求
+// 处理GET /v1/users请求
+// 参数:
+//   - c: Gin上下文
 func (s *Server) handleV1Users(c *gin.Context) {
+	// 创建模拟用户数据
 	users := []map[string]interface{}{
-		{"id": "1", "name": "用户1", "email": "user1@example.com"},
-		{"id": "2", "name": "用户2", "email": "user2@example.com"},
-		{"id": "3", "name": "用户3", "email": "user3@example.com"},
+		{
+			"id":       "1",
+			"name":     "张三",
+			"email":    "zhangsan@example.com",
+			"created":  time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
+			"active":   true,
+			"role":     "admin",
+			"location": "北京",
+		},
+		{
+			"id":       "2",
+			"name":     "李四",
+			"email":    "lisi@example.com",
+			"created":  time.Now().Add(-48 * time.Hour).Format(time.RFC3339),
+			"active":   true,
+			"role":     "user",
+			"location": "上海",
+		},
+		{
+			"id":       "3",
+			"name":     "王五",
+			"email":    "wangwu@example.com",
+			"created":  time.Now().Add(-72 * time.Hour).Format(time.RFC3339),
+			"active":   false,
+			"role":     "user",
+			"location": "广州",
+		},
 	}
+
+	// 返回用户列表
 	c.JSON(http.StatusOK, users)
 }
 
-// handleV1CreateUser 处理v1版本创建用户的API
+// handleV1CreateUser 处理V1版本创建用户请求
+// 处理POST /v1/users请求
+// 参数:
+//   - c: Gin上下文
 func (s *Server) handleV1CreateUser(c *gin.Context) {
-	var userData map[string]interface{}
-	if err := c.ShouldBindJSON(&userData); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的用户数据"})
+	// 解析请求体
+	var user map[string]interface{}
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error":   "无效的请求体",
+			"message": err.Error(),
+		})
 		return
 	}
 
-	// 添加ID
-	userData["id"] = uuid.New().String()
-	userData["created_at"] = time.Now().Format(time.RFC3339)
+	// 添加创建时间和ID
+	user["id"] = uuid.New().String()
+	user["created"] = time.Now().Format(time.RFC3339)
 
-	c.JSON(http.StatusCreated, userData)
+	// 返回创建的用户
+	c.JSON(http.StatusCreated, user)
 }
 
-// handleV1UserByID 处理v1版本根据ID获取用户的API
+// handleV1UserByID 处理V1版本获取单个用户请求
+// 处理GET /v1/users/:id请求
+// 参数:
+//   - c: Gin上下文
 func (s *Server) handleV1UserByID(c *gin.Context) {
+	// 获取用户ID
 	id := c.Param("id")
-	user := map[string]interface{}{
-		"id":         id,
-		"name":       "用户" + id,
-		"email":      "user" + id + "@example.com",
-		"created_at": time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
+
+	// 根据ID返回不同的用户数据
+	switch id {
+	case "1":
+		c.JSON(http.StatusOK, map[string]interface{}{
+			"id":       "1",
+			"name":     "张三",
+			"email":    "zhangsan@example.com",
+			"created":  time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
+			"active":   true,
+			"role":     "admin",
+			"location": "北京",
+			"profile": map[string]interface{}{
+				"avatar":      "https://example.com/avatars/1.jpg",
+				"phone":       "13800138001",
+				"description": "系统管理员",
+			},
+		})
+	case "2":
+		c.JSON(http.StatusOK, map[string]interface{}{
+			"id":       "2",
+			"name":     "李四",
+			"email":    "lisi@example.com",
+			"created":  time.Now().Add(-48 * time.Hour).Format(time.RFC3339),
+			"active":   true,
+			"role":     "user",
+			"location": "上海",
+			"profile": map[string]interface{}{
+				"avatar":      "https://example.com/avatars/2.jpg",
+				"phone":       "13800138002",
+				"description": "普通用户",
+			},
+		})
+	case "3":
+		c.JSON(http.StatusOK, map[string]interface{}{
+			"id":       "3",
+			"name":     "王五",
+			"email":    "wangwu@example.com",
+			"created":  time.Now().Add(-72 * time.Hour).Format(time.RFC3339),
+			"active":   false,
+			"role":     "user",
+			"location": "广州",
+			"profile": map[string]interface{}{
+				"avatar":      "https://example.com/avatars/3.jpg",
+				"phone":       "13800138003",
+				"description": "已禁用用户",
+			},
+		})
+	default:
+		c.JSON(http.StatusNotFound, map[string]interface{}{
+			"error":   "用户不存在",
+			"message": fmt.Sprintf("ID为%s的用户不存在", id),
+		})
 	}
-	c.JSON(http.StatusOK, user)
 }
 
-// handleV1Echo 处理v1版本回显API
+// handleV1Echo 处理V1版本Echo请求
+// 处理POST /v1/echo请求，返回请求信息
+// 参数:
+//   - c: Gin上下文
 func (s *Server) handleV1Echo(c *gin.Context) {
-	var data map[string]interface{}
-	if err := c.ShouldBindJSON(&data); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的请求数据"})
-		return
+	// 解析请求体
+	var requestBody map[string]interface{}
+	if err := c.ShouldBindJSON(&requestBody); err != nil {
+		requestBody = map[string]interface{}{} // 使用空对象
 	}
 
-	// 添加时间戳和ID
-	data["timestamp"] = time.Now().Format(time.RFC3339)
-	data["request_id"] = uuid.New().String()
+	// 构建响应
+	response := map[string]interface{}{
+		"request_id": uuid.New().String(),
+		"timestamp":  time.Now().Format(time.RFC3339),
+		"method":     c.Request.Method,
+		"path":       c.Request.URL.Path,
+		"headers":    c.Request.Header,
+		"query":      c.Request.URL.Query(),
+		"body":       requestBody,
+		"ip":         c.ClientIP(),
+	}
 
-	c.JSON(http.StatusOK, data)
+	// 如果请求体中有message字段，回显它
+	if message, exists := requestBody["message"]; exists {
+		response["message"] = message
+	}
+
+	// 返回响应
+	c.JSON(http.StatusOK, response)
 }
 
-// handleV2Users 处理v2版本获取用户列表的API
+// handleV2Users 处理V2版本用户列表请求
+// 处理GET /v2/users请求
+// 参数:
+//   - c: Gin上下文
 func (s *Server) handleV2Users(c *gin.Context) {
-	users := map[string]interface{}{
-		"data": []map[string]interface{}{
-			{"id": "1", "name": "用户1", "email": "user1@example.com", "role": "admin"},
-			{"id": "2", "name": "用户2", "email": "user2@example.com", "role": "user"},
-			{"id": "3", "name": "用户3", "email": "user3@example.com", "role": "user"},
+	// 创建模拟用户数据
+	users := []map[string]interface{}{
+		{
+			"id":      "1",
+			"name":    "张三",
+			"email":   "zhangsan@example.com",
+			"created": time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
+			"active":  true,
+			"role":    "admin",
 		},
-		"total": 3,
+		{
+			"id":      "2",
+			"name":    "李四",
+			"email":   "lisi@example.com",
+			"created": time.Now().Add(-48 * time.Hour).Format(time.RFC3339),
+			"active":  true,
+			"role":    "user",
+		},
+		{
+			"id":      "3",
+			"name":    "王五",
+			"email":   "wangwu@example.com",
+			"created": time.Now().Add(-72 * time.Hour).Format(time.RFC3339),
+			"active":  false,
+			"role":    "user",
+		},
 	}
-	c.JSON(http.StatusOK, users)
+
+	// 返回标准格式的响应
+	c.JSON(http.StatusOK, map[string]interface{}{
+		"data":     users,
+		"total":    len(users),
+		"page":     1,
+		"per_page": len(users),
+		"metadata": map[string]interface{}{
+			"version":   "v2",
+			"timestamp": time.Now().Format(time.RFC3339),
+			"api_name":  "users",
+		},
+	})
 }
 
-// handleV2CreateUser 处理v2版本创建用户的API
+// handleV2CreateUser 处理V2版本创建用户请求
+// 处理POST /v2/users请求
+// 参数:
+//   - c: Gin上下文
 func (s *Server) handleV2CreateUser(c *gin.Context) {
+	// 解析请求体
+	var requestData map[string]interface{}
+	if err := c.ShouldBindJSON(&requestData); err != nil {
+		c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": map[string]interface{}{
+				"code":    "BAD_REQUEST",
+				"message": "无效的请求体: " + err.Error(),
+			},
+			"metadata": map[string]interface{}{
+				"version":   "v2",
+				"timestamp": time.Now().Format(time.RFC3339),
+				"api_name":  "users",
+			},
+		})
+		return
+	}
+
+	// 获取用户数据
 	var userData map[string]interface{}
-	if err := c.ShouldBindJSON(&userData); err != nil {
-		c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":  "无效的用户数据",
-			"detail": err.Error(),
-		})
-		return
+	if data, ok := requestData["data"].(map[string]interface{}); ok {
+		userData = data
+	} else {
+		userData = requestData // 兼容直接传递用户数据的情况
 	}
 
-	// 添加ID
+	// 添加ID和创建时间
 	userData["id"] = uuid.New().String()
-	userData["created_at"] = time.Now().Format(time.RFC3339)
+	userData["created"] = time.Now().Format(time.RFC3339)
 
-	result := map[string]interface{}{
-		"data":    userData,
-		"message": "用户创建成功",
-	}
-	c.JSON(http.StatusCreated, result)
-}
-
-// handleV2UserByID 处理v2版本根据ID获取用户的API
-func (s *Server) handleV2UserByID(c *gin.Context) {
-	id := c.Param("id")
-	user := map[string]interface{}{
-		"data": map[string]interface{}{
-			"id":         id,
-			"name":       "用户" + id,
-			"email":      "user" + id + "@example.com",
-			"role":       "user",
-			"created_at": time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
-			"updated_at": time.Now().Format(time.RFC3339),
+	// 返回标准格式的响应
+	c.JSON(http.StatusCreated, map[string]interface{}{
+		"data": userData,
+		"metadata": map[string]interface{}{
+			"version":   "v2",
+			"timestamp": time.Now().Format(time.RFC3339),
+			"api_name":  "users",
+			"action":    "create",
 		},
-	}
-	c.JSON(http.StatusOK, user)
+	})
 }
 
-// handleV2Echo 处理v2版本回显API
-func (s *Server) handleV2Echo(c *gin.Context) {
-	var data map[string]interface{}
-	if err := c.ShouldBindJSON(&data); err != nil {
-		c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":  "无效的请求数据",
-			"detail": err.Error(),
-		})
-		return
+// handleV2UserByID 处理V2版本获取单个用户请求
+// 处理GET /v2/users/:id请求
+// 参数:
+//   - c: Gin上下文
+func (s *Server) handleV2UserByID(c *gin.Context) {
+	// 获取用户ID
+	id := c.Param("id")
+
+	// 根据ID查找对应的用户数据
+	var userData map[string]interface{}
+	var exists bool
+
+	switch id {
+	case "1":
+		userData = map[string]interface{}{
+			"id":      "1",
+			"name":    "张三",
+			"email":   "zhangsan@example.com",
+			"created": time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
+			"active":  true,
+			"role":    "admin",
+			"profile": map[string]interface{}{
+				"avatar": "https://example.com/avatars/1.jpg",
+				"phone":  "13800138001",
+			},
+		}
+		exists = true
+	case "2":
+		userData = map[string]interface{}{
+			"id":      "2",
+			"name":    "李四",
+			"email":   "lisi@example.com",
+			"created": time.Now().Add(-48 * time.Hour).Format(time.RFC3339),
+			"active":  true,
+			"role":    "user",
+			"profile": map[string]interface{}{
+				"avatar": "https://example.com/avatars/2.jpg",
+				"phone":  "13800138002",
+			},
+		}
+		exists = true
+	case "3":
+		userData = map[string]interface{}{
+			"id":      "3",
+			"name":    "王五",
+			"email":   "wangwu@example.com",
+			"created": time.Now().Add(-72 * time.Hour).Format(time.RFC3339),
+			"active":  false,
+			"role":    "user",
+			"profile": map[string]interface{}{
+				"avatar": "https://example.com/avatars/3.jpg",
+				"phone":  "13800138003",
+			},
+		}
+		exists = true
+	default:
+		exists = false
 	}
 
-	// 添加元数据
+	if exists {
+		// 返回标准格式的响应
+		c.JSON(http.StatusOK, map[string]interface{}{
+			"data": userData,
+			"metadata": map[string]interface{}{
+				"version":   "v2",
+				"timestamp": time.Now().Format(time.RFC3339),
+				"api_name":  "users",
+				"action":    "get",
+			},
+		})
+	} else {
+		// 返回标准格式的错误响应
+		c.JSON(http.StatusNotFound, map[string]interface{}{
+			"error": map[string]interface{}{
+				"code":    "USER_NOT_FOUND",
+				"message": fmt.Sprintf("ID为%s的用户不存在", id),
+			},
+			"metadata": map[string]interface{}{
+				"version":   "v2",
+				"timestamp": time.Now().Format(time.RFC3339),
+				"api_name":  "users",
+				"action":    "get",
+			},
+		})
+	}
+}
+
+// handleV2Echo 处理V2版本Echo请求
+// 处理POST /v2/echo请求，返回请求信息的标准格式
+// 参数:
+//   - c: Gin上下文
+func (s *Server) handleV2Echo(c *gin.Context) {
+	// 解析请求体
+	var requestBody map[string]interface{}
+	if err := c.ShouldBindJSON(&requestBody); err != nil {
+		requestBody = map[string]interface{}{} // 使用空对象
+	}
+
+	// 提取message字段
+	var message interface{}
+	if msg, exists := requestBody["message"]; exists {
+		message = msg
+	} else {
+		message = "No message provided"
+	}
+
+	// 构建数据部分
+	data := map[string]interface{}{
+		"message":    message,
+		"request_id": uuid.New().String(),
+		"method":     c.Request.Method,
+		"path":       c.Request.URL.Path,
+		"query":      c.Request.URL.Query(),
+		"body":       requestBody,
+	}
+
+	// 构建元数据部分
 	metadata := map[string]interface{}{
+		"version":    "v2",
 		"timestamp":  time.Now().Format(time.RFC3339),
 		"request_id": uuid.New().String(),
-		"version":    "v2",
+		"api_name":   "echo",
 	}
 
-	result := map[string]interface{}{
+	// 返回标准格式的响应
+	c.JSON(http.StatusOK, map[string]interface{}{
 		"data":     data,
 		"metadata": metadata,
-	}
-	c.JSON(http.StatusOK, result)
+	})
 }
 
 // generateRandomPassword 生成随机密码
+// 生成指定长度的随机密码，包含字母、数字和特殊字符
+// 参数:
+//   - length: 密码长度
+//
+// 返回:
+//   - string: 生成的随机密码
 func generateRandomPassword(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	rand.Seed(time.Now().UnixNano())
-	password := make([]byte, length)
-	for i := range password {
-		password[i] = charset[rand.Intn(len(charset))]
+	if length < 8 {
+		length = 8 // 确保最小长度为8
 	}
+
+	// 字符集
+	chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+"
+
+	// 随机种子
+	rand.Seed(time.Now().UnixNano())
+
+	// 生成密码
+	password := make([]byte, length)
+	for i := 0; i < length; i++ {
+		password[i] = chars[rand.Intn(len(chars))]
+	}
+
 	return string(password)
 }
