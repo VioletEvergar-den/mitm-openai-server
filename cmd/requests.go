@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/llm-sec/fake-openapi-server/pkg/api"
+	"github.com/llm-sec/mitm-openapi-server/pkg/api"
 	"github.com/spf13/cobra"
 )
 
