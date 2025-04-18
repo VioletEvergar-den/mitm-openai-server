@@ -551,9 +551,6 @@ func (s *Server) setupUIRoutes() {
 		c.Redirect(http.StatusTemporaryRedirect, "/ui/")
 	})
 
-	// 前端静态文件 - 注意：这必须在具体路由之前注册
-	s.router.Static("/ui", "./ui")
-
 	// 前端API路由
 	ui := s.router.Group("/ui/api")
 	ui.Use(uiAuth)
@@ -720,4 +717,7 @@ func (s *Server) setupUIRoutes() {
 			})
 		})
 	}
+
+	// 前端静态文件 - 注意：必须在特定路由之后注册，避免通配符路由冲突
+	s.router.Static("/ui", "./ui")
 }
