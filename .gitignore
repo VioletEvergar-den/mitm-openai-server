@@ -50,6 +50,7 @@ mitm-openai-server.exe
 
 # 数据目录
 /data/
+/data/*.json
 
 # 调试文件
 __debug_bin*
