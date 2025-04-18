@@ -1,8 +1,10 @@
 package utils
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -298,4 +300,189 @@ func SendProxyRequest(reqMethod, targetURL, path string, headers map[string]stri
 	}
 
 	return result, nil
+}
+
+// ResponseRecorder 实现了http.ResponseWriter接口，并记录响应数据
+// 用于捕获API响应以便存储和分析
+type ResponseRecorder struct {
+	http.ResponseWriter
+	Body   *bytes.Buffer // 响应体的缓冲区
+	status int           // HTTP状态码
+}
+
+// NewResponseRecorder 创建一个新的ResponseRecorder
+// 参数:
+//   - w: 原始的ResponseWriter
+//
+// 返回:
+//   - *ResponseRecorder: 包装后的ResponseWriter
+func NewResponseRecorder(w http.ResponseWriter) *ResponseRecorder {
+	return &ResponseRecorder{
+		ResponseWriter: w,
+		Body:           &bytes.Buffer{},
+		status:         http.StatusOK, // 默认状态码为200
+	}
+}
+
+// Write 实现http.ResponseWriter接口的Write方法
+// 将数据写入原始ResponseWriter的同时，也写入缓冲区
+// 参数:
+//   - b: 要写入的字节切片
+//
+// 返回:
+//   - int: 写入的字节数
+//   - error: 如果写入失败，返回错误
+func (r *ResponseRecorder) Write(b []byte) (int, error) {
+	// 同时写入到原始ResponseWriter和缓冲区
+	r.Body.Write(b)
+	return r.ResponseWriter.Write(b)
+}
+
+// WriteHeader 实现http.ResponseWriter接口的WriteHeader方法
+// 记录状态码并调用原始ResponseWriter的WriteHeader方法
+// 参数:
+//   - statusCode: HTTP状态码
+func (r *ResponseRecorder) WriteHeader(statusCode int) {
+	r.status = statusCode
+	r.ResponseWriter.WriteHeader(statusCode)
+}
+
+// Status 返回记录的HTTP状态码
+// 返回:
+//   - int: HTTP状态码
+func (r *ResponseRecorder) Status() int {
+	return r.status
+}
+
+// Header 返回HTTP响应头
+// 返回:
+//   - http.Header: 响应头
+func (r *ResponseRecorder) Header() http.Header {
+	return r.ResponseWriter.Header()
+}
+
+// Flush 实现http.Flusher接口
+func (r *ResponseRecorder) Flush() {
+	// 如果原始ResponseWriter实现了Flusher接口，则调用它的Flush方法
+	if flusher, ok := r.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+// Hijack 实现http.Hijacker接口
+func (r *ResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	// 如果原始ResponseWriter实现了Hijacker接口，则调用它的Hijack方法
+	if hijacker, ok := r.ResponseWriter.(http.Hijacker); ok {
+		return hijacker.Hijack()
+	}
+	return nil, nil, errors.New("underlying ResponseWriter does not implement http.Hijacker")
+}
+
+// CloseNotify 实现http.CloseNotifier接口
+func (r *ResponseRecorder) CloseNotify() <-chan bool {
+	// 如果原始ResponseWriter实现了CloseNotifier接口，则调用它的CloseNotify方法
+	if closer, ok := r.ResponseWriter.(http.CloseNotifier); ok {
+		return closer.CloseNotify()
+	}
+	return make(chan bool, 1)
+}
+
+// Push 实现http.Pusher接口
+// 用于支持HTTP/2的服务器推送功能
+// 参数:
+//   - target: 推送的目标路径
+//   - opts: 推送选项
+//
+// 返回:
+//   - error: 如果底层ResponseWriter不支持Push，返回错误
+func (r *ResponseRecorder) Push(target string, opts *http.PushOptions) error {
+	if pusher, ok := r.ResponseWriter.(http.Pusher); ok {
+		return pusher.Push(target, opts)
+	}
+	return fmt.Errorf("底层ResponseWriter不支持Push方法")
+}
+
+// Pusher 实现gin.ResponseWriter的Pusher方法
+// 返回底层ResponseWriter的http.Pusher
+// 返回:
+//   - http.Pusher: 底层ResponseWriter的Pusher，如果支持的话
+func (r *ResponseRecorder) Pusher() http.Pusher {
+	if pusher, ok := r.ResponseWriter.(http.Pusher); ok {
+		return pusher
+	}
+	return nil
+}
+
+// ReadFrom 实现io.ReaderFrom接口
+func (r *ResponseRecorder) ReadFrom(src io.Reader) (n int64, err error) {
+	// 如果原始ResponseWriter实现了ReaderFrom接口，则调用它的ReadFrom方法
+	if readFrom, ok := r.ResponseWriter.(io.ReaderFrom); ok {
+		return readFrom.ReadFrom(src)
+	}
+
+	// 否则手动实现
+	buf := make([]byte, 32*1024) // 32KB缓冲区
+	var total int64
+
+	for {
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			// 写入缓冲区
+			r.Body.Write(buf[:nr])
+
+			// 写入原始ResponseWriter
+			nw, ew := r.ResponseWriter.Write(buf[:nr])
+			if ew != nil {
+				err = ew
+				break
+			}
+			if nw != nr {
+				err = io.ErrShortWrite
+				break
+			}
+			total += int64(nw)
+		}
+		if er == io.EOF {
+			break
+		}
+		if er != nil {
+			err = er
+			break
+		}
+	}
+
+	return total, err
+}
+
+// Size 返回已写入响应体的字节数
+// 返回:
+//   - int: 已写入的字节数
+func (r *ResponseRecorder) Size() int {
+	return r.Body.Len()
+}
+
+// WriteString 将字符串写入响应体
+// 参数:
+//   - s: 要写入的字符串
+//
+// 返回:
+//   - int: 写入的字节数
+//   - error: 如果写入失败，返回错误
+func (r *ResponseRecorder) WriteString(s string) (int, error) {
+	r.Body.WriteString(s)
+	return r.ResponseWriter.Write([]byte(s))
+}
+
+// Written 返回响应体是否已经写入
+// 返回:
+//   - bool: 如果响应体已写入，返回true
+func (r *ResponseRecorder) Written() bool {
+	return r.Body.Len() > 0
+}
+
+// WriteHeaderNow 强制写入HTTP头（状态码+头部）
+func (r *ResponseRecorder) WriteHeaderNow() {
+	if !r.Written() {
+		r.WriteHeader(r.status)
+	}
 }

@@ -83,7 +83,10 @@ func CreateTestRequestWithParams(method string, path string, params gin.Params, 
 }
 
 // 创建一个测试请求
-func createTestRequest(id string) *storage.Request {
+func CreateTestRequest(id string) *storage.Request {
+	if id == "" {
+		id = fmt.Sprintf("test-%d", time.Now().UnixNano())
+	}
 	return &storage.Request{
 		ID:        id,
 		Method:    "GET",
@@ -114,7 +117,7 @@ func testStorageImplementation(t *testing.T, storage storage.Storage) {
 	assert.NoError(t, err, "应能清理所有请求")
 
 	// 保存请求
-	req1 := createTestRequest("test-id-1")
+	req1 := CreateTestRequest("test-id-1")
 	err = storage.SaveRequest(req1)
 	assert.NoError(t, err, "应能保存请求")
 
@@ -139,7 +142,7 @@ func testStorageImplementation(t *testing.T, storage storage.Storage) {
 
 	// 批量保存
 	for i := 1; i <= 5; i++ {
-		req := createTestRequest(fmt.Sprintf("test-id-%d", i))
+		req := CreateTestRequest(fmt.Sprintf("test-id-%d", i))
 		err = storage.SaveRequest(req)
 		assert.NoError(t, err, "应能保存请求")
 	}
@@ -173,7 +176,7 @@ func testStorageReopen(t *testing.T, createStorage func() (storage.Storage, erro
 	storage, err = createStorage()
 	require.NoError(t, err, "应能创建存储")
 
-	req1 := createTestRequest("reopen-id-1")
+	req1 := CreateTestRequest("reopen-id-1")
 	err = storage.SaveRequest(req1)
 	assert.NoError(t, err, "应能保存请求")
 
