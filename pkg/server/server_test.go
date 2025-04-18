@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/llm-sec/mitm-openapi-server/pkg/testutils"
+	"github.com/llm-sec/mitm-openai-server/pkg/testutils"
 )
 
 // TestNewServer 测试服务器创建
