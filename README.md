@@ -22,8 +22,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/llm-sec/mitm-openapi-server.git
-cd mitm-openapi-server
+git clone https://github.com/llm-sec/mitm-openai-server.git
+cd mitm-openai-server
 
 # 安装依赖
 go mod tidy
