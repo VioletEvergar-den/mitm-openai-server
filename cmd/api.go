@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/llm-sec/fake-openapi-server/pkg/api"
+	"github.com/llm-sec/mitm-openapi-server/pkg/api"
 	"github.com/spf13/cobra"
 )
 
@@ -25,19 +25,34 @@ var (
 	uiUsername     string
 	uiPassword     string
 	generateUIAuth bool
+
+	// 中间人代理相关标志
+	proxyMode      bool
+	targetURL      string
+	targetAuthType string
+	targetUsername string
+	targetPassword string
+	targetToken    string
 )
 
 // apiCmd 表示api子命令
 var apiCmd = &cobra.Command{
 	Use:   "api",
 	Short: "启动API服务器",
-	Long: `启动一个假的OpenAPI服务器，用于接收请求并记录。
+	Long: `启动一个中间人OpenAPI服务器，用于接收、转发和记录请求。
 
 例如:
+  # 启动独立模式服务器（返回模拟数据）
   fake-openapi-server api --port 8080 --data ./data
+  
+  # 带认证的独立模式
   fake-openapi-server api --auth-type basic --auth-username admin --auth-password secret
-  fake-openapi-server api --auth-type token --auth-token my-secret-token
-  fake-openapi-server api --generate-ui-auth --ui-username admin`,
+  
+  # 代理模式（转发到真实API）
+  fake-openapi-server api --proxy-mode --target-url https://api.example.com
+  
+  # 带认证的代理模式
+  fake-openapi-server api --proxy-mode --target-url https://api.example.com --target-auth-type basic --target-username user --target-password pass`,
 	Run: func(cmd *cobra.Command, args []string) {
 		runAPIServer()
 	},
@@ -60,6 +75,14 @@ func init() {
 	apiCmd.Flags().BoolVar(&generateUIAuth, "generate-ui-auth", true, "生成随机UI认证凭证")
 	apiCmd.Flags().StringVar(&uiUsername, "ui-username", "admin", "前端UI用户名")
 	apiCmd.Flags().StringVar(&uiPassword, "ui-password", "", "前端UI密码 (留空则自动生成)")
+
+	// 中间人代理相关标志
+	apiCmd.Flags().BoolVar(&proxyMode, "proxy-mode", false, "启用代理模式（转发到真实API）")
+	apiCmd.Flags().StringVar(&targetURL, "target-url", "", "目标API服务器地址")
+	apiCmd.Flags().StringVar(&targetAuthType, "target-auth-type", "none", "目标API认证类型 (none, basic, token)")
+	apiCmd.Flags().StringVar(&targetUsername, "target-username", "", "目标API基本认证用户名")
+	apiCmd.Flags().StringVar(&targetPassword, "target-password", "", "目标API基本认证密码")
+	apiCmd.Flags().StringVar(&targetToken, "target-token", "", "目标API令牌")
 }
 
 func runAPIServer() {
@@ -99,6 +122,14 @@ func runAPIServer() {
 		UIUsername:     uiUsername,
 		UIPassword:     uiPassword,
 		GenerateUIAuth: generateUIAuth,
+
+		// 中间人代理相关配置
+		ProxyMode:      proxyMode,
+		TargetURL:      targetURL,
+		TargetAuthType: targetAuthType,
+		TargetUsername: targetUsername,
+		TargetPassword: targetPassword,
+		TargetToken:    targetToken,
 	}
 
 	// 创建并启动服务器
@@ -124,6 +155,23 @@ func runAPIServer() {
 		}
 	} else {
 		log.Printf("认证已禁用")
+	}
+
+	// 代理模式信息
+	if proxyMode {
+		if targetURL == "" {
+			log.Printf("警告: 代理模式已启用，但未指定目标URL，将使用模拟响应")
+		} else {
+			log.Printf("代理模式已启用，目标: %s", targetURL)
+
+			if targetAuthType != "none" {
+				log.Printf("目标API认证类型: %s", targetAuthType)
+			} else {
+				log.Printf("目标API认证已禁用")
+			}
+		}
+	} else {
+		log.Printf("独立模式，使用模拟响应")
 	}
 
 	if err := server.Run(addr); err != nil {
