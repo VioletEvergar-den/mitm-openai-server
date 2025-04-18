@@ -42,8 +42,17 @@ dist/
 *.swp
 *.swo 
 
+# 编译产物
 fake-openapi-server
 fake-openapi-server.exe
+mitm-openai-server
+mitm-openai-server.exe
+
+# 数据目录
+/data/
+
+# 调试文件
+__debug_bin*
 
 
 
