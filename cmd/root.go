@@ -22,8 +22,8 @@ var (
 
 可以使用不同的子命令来启动服务器、管理请求数据或查看版本信息。`,
 		Run: func(cmd *cobra.Command, args []string) {
-			// 如果没有指定子命令，则显示帮助
-			cmd.Help()
+			// 如果没有指定子命令，默认执行server子命令
+			serverCmd.Run(cmd, args)
 		},
 	}
 )
