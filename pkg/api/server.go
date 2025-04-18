@@ -1,7 +1,10 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"os"
@@ -26,6 +29,14 @@ type ServerConfig struct {
 	UIUsername     string // 前端UI用户名
 	UIPassword     string // 前端UI密码
 	GenerateUIAuth bool   // 是否生成随机UI认证凭证
+
+	// 中间人代理相关配置
+	ProxyMode      bool   // 是否启用代理模式
+	TargetURL      string // 目标OpenAPI服务地址
+	TargetAuthType string // 目标API认证类型：none, basic, token
+	TargetUsername string // 目标API基本认证用户名
+	TargetPassword string // 目标API基本认证密码
+	TargetToken    string // 目标API令牌
 }
 
 // Server 表示API服务器
@@ -245,15 +256,98 @@ func (s *Server) apiMiddleware() gin.HandlerFunc {
 			}
 		}
 
-		// 尝试获取请求体
+		// 获取请求体
+		var bodyBytes []byte
 		var body interface{}
-		if c.Request.ContentLength > 0 {
-			if err := c.ShouldBindJSON(&body); err == nil {
-				req.Body = body
+
+		if c.Request.Body != nil {
+			bodyBytes, _ = io.ReadAll(c.Request.Body)
+			// 重新设置请求体，因为读取后Body会被消耗
+			c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+			// 尝试解析JSON
+			if len(bodyBytes) > 0 {
+				if err := json.Unmarshal(bodyBytes, &body); err == nil {
+					req.Body = body
+				}
 			}
 		}
 
-		// 保存请求
+		// 设置请求ID和时间戳
+		c.Set("request_id", req.ID)
+		c.Set("request_timestamp", req.Timestamp)
+
+		// 在代理模式下，转发请求到目标API
+		if s.config.ProxyMode && s.config.TargetURL != "" {
+			// 调用代理函数
+			proxyResp, err := sendProxyRequest(
+				c.Request.Method,
+				s.config.TargetURL,
+				path,
+				req.Headers,
+				bodyBytes,
+				s.config,
+			)
+
+			if err != nil {
+				// 代理请求失败，返回错误信息
+				c.JSON(http.StatusBadGateway, StandardResponse{
+					Status:  "error",
+					Message: "代理请求失败: " + err.Error(),
+				})
+
+				// 记录失败的请求
+				req.Response = &ProxyResponse{
+					StatusCode: http.StatusBadGateway,
+					Headers:    map[string]string{"Content-Type": "application/json"},
+					Body: map[string]interface{}{
+						"status":  "error",
+						"message": "代理请求失败: " + err.Error(),
+					},
+				}
+
+				if err := s.storage.SaveRequest(req); err != nil {
+					fmt.Printf("保存请求记录失败: %v\n", err)
+				}
+
+				c.Abort()
+				return
+			}
+
+			// 记录代理响应
+			req.Response = proxyResp
+
+			// 保存请求记录
+			if err := s.storage.SaveRequest(req); err != nil {
+				fmt.Printf("保存请求记录失败: %v\n", err)
+			}
+
+			// 设置响应状态码
+			c.Status(proxyResp.StatusCode)
+
+			// 转发响应头
+			for k, v := range proxyResp.Headers {
+				// 避免设置一些特定的头，这些头由Gin框架处理
+				if strings.ToLower(k) != "content-length" {
+					c.Header(k, v)
+				}
+			}
+
+			// 返回代理响应体
+			if proxyResp.Body != nil {
+				switch body := proxyResp.Body.(type) {
+				case string:
+					c.String(proxyResp.StatusCode, body)
+				default:
+					c.JSON(proxyResp.StatusCode, body)
+				}
+			}
+
+			c.Abort() // 终止后续处理
+			return
+		}
+
+		// 在非代理模式下，保存请求继续处理
 		if err := s.storage.SaveRequest(req); err != nil {
 			c.JSON(http.StatusInternalServerError, StandardResponse{
 				Status:  "error",
@@ -263,11 +357,7 @@ func (s *Server) apiMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// 设置请求ID
-		c.Set("request_id", req.ID)
-		c.Set("request_timestamp", req.Timestamp)
-
-		// 继续处理请求
+		// 继续处理请求（返回模拟响应）
 		c.Next()
 	}
 }
