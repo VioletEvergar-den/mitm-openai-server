@@ -33,6 +33,10 @@ var (
 	targetUsername string
 	targetPassword string
 	targetToken    string
+
+	// 存储相关标志
+	useSQL     bool
+	sqlitePath string
 )
 
 // apiCmd 表示api子命令
@@ -83,6 +87,10 @@ func init() {
 	apiCmd.Flags().StringVar(&targetUsername, "target-username", "", "目标API基本认证用户名")
 	apiCmd.Flags().StringVar(&targetPassword, "target-password", "", "目标API基本认证密码")
 	apiCmd.Flags().StringVar(&targetToken, "target-token", "", "目标API令牌")
+
+	// 存储相关标志
+	apiCmd.Flags().BoolVar(&useSQL, "use-sql", false, "启用SQLite存储")
+	apiCmd.Flags().StringVar(&sqlitePath, "sqlite-path", "", "SQLite数据库路径")
 }
 
 func runAPIServer() {
@@ -104,9 +112,32 @@ func runAPIServer() {
 	}
 
 	// 创建存储
-	storage, err := api.NewFileStorage(absDataDir)
-	if err != nil {
-		log.Fatalf("初始化存储失败: %v", err)
+	var storage api.Storage
+
+	if useSQL {
+		// 使用SQLite存储
+		dbPath := sqlitePath
+		if dbPath == "" {
+			dbPath = filepath.Join(absDataDir, "requests.db")
+		}
+
+		log.Printf("使用SQLite存储，数据库路径: %s", dbPath)
+		sqlStorage, err := api.NewSQLiteStorage(dbPath)
+		if err != nil {
+			log.Fatalf("初始化SQLite存储失败: %v", err)
+		}
+
+		// 确保在程序结束时关闭数据库
+		defer sqlStorage.Close()
+		storage = sqlStorage
+	} else {
+		// 使用文件存储
+		log.Printf("使用文件存储，数据目录: %s", absDataDir)
+		fileStorage, err := api.NewFileStorage(absDataDir)
+		if err != nil {
+			log.Fatalf("初始化文件存储失败: %v", err)
+		}
+		storage = fileStorage
 	}
 
 	// 创建服务器配置
