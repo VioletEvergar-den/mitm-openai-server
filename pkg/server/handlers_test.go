@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/llm-sec/mitm-openapi-server/pkg/testutils"
+	"github.com/llm-sec/mitm-openai-server/pkg/testutils"
 )
 
 // TestV1APIHandlers 测试v1版本API处理程序
