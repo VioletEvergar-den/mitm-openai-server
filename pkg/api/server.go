@@ -15,7 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/llm-sec/mitm-openapi-server/pkg/utils"
+	"github.com/llm-sec/mitm-openai-server/pkg/utils"
 )
 
 // ServerConfig 存储服务器配置
