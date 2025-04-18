@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/llm-sec/mitm-openapi-server/pkg/server"
-	"github.com/llm-sec/mitm-openapi-server/pkg/storage"
+	"github.com/llm-sec/mitm-openai-server/pkg/server"
+	"github.com/llm-sec/mitm-openai-server/pkg/storage"
 )
 
 // CreateTestStorage 创建一个用于测试的存储实例
