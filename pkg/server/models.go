@@ -2,7 +2,7 @@ package server
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/llm-sec/mitm-openapi-server/pkg/storage"
+	"github.com/llm-sec/mitm-openai-server/pkg/storage"
 )
 
 // Request 表示接收到的请求数据
