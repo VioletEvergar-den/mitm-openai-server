@@ -7,7 +7,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
-	"os"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -582,17 +582,10 @@ func (s *Server) setupUIRoutes() {
 		// 删除单个请求
 		ui.DELETE("/requests/:id", func(c *gin.Context) {
 			id := c.Param("id")
-			filePath := filepath.Join(s.config.Storage.(*FileStorage).dataDir, fmt.Sprintf("%s.json", id))
-			if _, err := os.Stat(filePath); os.IsNotExist(err) {
-				c.JSON(http.StatusNotFound, gin.H{"error": "请求不存在"})
-				return
-			}
-
-			if err := os.Remove(filePath); err != nil {
+			if err := s.storage.DeleteRequest(id); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
-
 			c.JSON(http.StatusOK, gin.H{"success": true})
 		})
 
@@ -606,6 +599,124 @@ func (s *Server) setupUIRoutes() {
 					"enabled": s.config.EnableAuth,
 					"type":    s.config.AuthType,
 				},
+				"proxy": gin.H{
+					"enabled":   s.config.ProxyMode,
+					"targetURL": s.config.TargetURL,
+				},
+			})
+		})
+
+		// 获取数据库统计信息
+		ui.GET("/storage-stats", func(c *gin.Context) {
+			stats, err := s.storage.GetDatabaseStats()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, stats)
+		})
+
+		// 清空所有请求
+		ui.DELETE("/requests", func(c *gin.Context) {
+			if err := s.storage.DeleteAllRequests(); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"success": true})
+		})
+
+		// 导出请求为JSONL
+		ui.GET("/export", func(c *gin.Context) {
+			exportPath, err := s.storage.ExportRequestsAsJSONL()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"success":      true,
+				"path":         exportPath,
+				"download_url": "/ui/api/download?path=" + url.QueryEscape(exportPath),
+			})
+		})
+
+		// 下载导出的文件
+		ui.GET("/download", func(c *gin.Context) {
+			path := c.Query("path")
+			if path == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "缺少文件路径参数"})
+				return
+			}
+
+			// 安全检查，确保路径以exports目录开头
+			if !strings.Contains(path, "exports") {
+				c.JSON(http.StatusForbidden, gin.H{"error": "无效的文件路径"})
+				return
+			}
+
+			// 提供文件下载
+			filename := filepath.Base(path)
+			c.Header("Content-Disposition", "attachment; filename="+filename)
+			c.Header("Content-Type", "application/octet-stream")
+			c.File(path)
+		})
+
+		// 获取代理配置
+		ui.GET("/proxy-config", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"enabled":   s.config.ProxyMode,
+				"targetURL": s.config.TargetURL,
+				"authType":  s.config.TargetAuthType,
+				"username":  s.config.TargetUsername,
+				"password":  s.config.TargetPassword != "", // 只返回是否设置了密码，不返回实际密码
+				"tokenSet":  s.config.TargetToken != "",    // 只返回是否设置了令牌，不返回实际令牌
+			})
+		})
+
+		// 更新代理配置
+		ui.POST("/proxy-config", func(c *gin.Context) {
+			var config struct {
+				Enabled    bool   `json:"enabled"`
+				TargetURL  string `json:"targetURL"`
+				AuthType   string `json:"authType"`
+				Username   string `json:"username"`
+				Password   string `json:"password"`
+				Token      string `json:"token"`
+				UpdateAuth bool   `json:"updateAuth"`
+			}
+
+			if err := c.ShouldBindJSON(&config); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "无效的配置数据"})
+				return
+			}
+
+			// 更新配置
+			s.config.ProxyMode = config.Enabled
+
+			if config.TargetURL != "" {
+				s.config.TargetURL = config.TargetURL
+			}
+
+			if config.AuthType != "" {
+				s.config.TargetAuthType = config.AuthType
+			}
+
+			// 如果需要更新认证信息
+			if config.UpdateAuth {
+				s.config.TargetUsername = config.Username
+
+				if config.Password != "" {
+					s.config.TargetPassword = config.Password
+				}
+
+				if config.Token != "" {
+					s.config.TargetToken = config.Token
+				}
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"message": "代理配置已更新",
 			})
 		})
 	}
