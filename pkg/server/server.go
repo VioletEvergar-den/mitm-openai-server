@@ -13,8 +13,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/llm-sec/mitm-openapi-server/pkg/storage"
-	"github.com/llm-sec/mitm-openapi-server/pkg/utils"
+	"github.com/llm-sec/mitm-openai-server/pkg/storage"
+	"github.com/llm-sec/mitm-openai-server/pkg/utils"
 )
 
 // NewServer 创建一个新的服务器实例
