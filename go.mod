@@ -1,4 +1,4 @@
-module github.com/llm-sec/fake-openapi-server
+module github.com/llm-sec/mitm-openapi-server
 
 go 1.20
 
