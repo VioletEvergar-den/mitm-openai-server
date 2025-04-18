@@ -16,6 +16,10 @@ type Storage interface {
 	SaveRequest(req *Request) error
 	GetAllRequests() ([]*Request, error)
 	GetRequestByID(id string) (*Request, error)
+	DeleteRequest(id string) error
+	DeleteAllRequests() error
+	GetDatabaseStats() (map[string]interface{}, error)
+	ExportRequestsAsJSONL() (string, error)
 }
 
 // FileStorage 实现了将请求存储到文件中
@@ -115,4 +119,107 @@ func (fs *FileStorage) GetRequestByID(id string) (*Request, error) {
 	}
 
 	return &req, nil
+}
+
+// DeleteRequest 根据ID删除请求
+func (fs *FileStorage) DeleteRequest(id string) error {
+	fs.mutex.Lock()
+	defer fs.mutex.Unlock()
+
+	filePath := filepath.Join(fs.dataDir, fmt.Sprintf("%s.json", id))
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return fmt.Errorf("请求ID不存在: %s", id)
+	}
+
+	if err := os.Remove(filePath); err != nil {
+		return fmt.Errorf("删除请求失败: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteAllRequests 删除所有请求
+func (fs *FileStorage) DeleteAllRequests() error {
+	fs.mutex.Lock()
+	defer fs.mutex.Unlock()
+
+	files, err := os.ReadDir(fs.dataDir)
+	if err != nil {
+		return fmt.Errorf("读取数据目录失败: %w", err)
+	}
+
+	for _, file := range files {
+		if !file.IsDir() && filepath.Ext(file.Name()) == ".json" {
+			filePath := filepath.Join(fs.dataDir, file.Name())
+			if err := os.Remove(filePath); err != nil {
+				return fmt.Errorf("删除文件失败: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// GetDatabaseStats 获取存储统计信息
+func (fs *FileStorage) GetDatabaseStats() (map[string]interface{}, error) {
+	fs.mutex.RLock()
+	defer fs.mutex.RUnlock()
+
+	stats := map[string]interface{}{}
+
+	files, err := os.ReadDir(fs.dataDir)
+	if err != nil {
+		return nil, fmt.Errorf("读取数据目录失败: %w", err)
+	}
+
+	count := 0
+	var totalSize int64
+	for _, file := range files {
+		if !file.IsDir() && filepath.Ext(file.Name()) == ".json" {
+			count++
+			fileInfo, err := file.Info()
+			if err == nil {
+				totalSize += fileInfo.Size()
+			}
+		}
+	}
+
+	stats["count"] = count
+	stats["size"] = totalSize
+	stats["path"] = fs.dataDir
+
+	return stats, nil
+}
+
+// ExportRequestsAsJSONL 导出所有请求为JSONL格式
+func (fs *FileStorage) ExportRequestsAsJSONL() (string, error) {
+	// 获取所有请求
+	requests, err := fs.GetAllRequests()
+	if err != nil {
+		return "", fmt.Errorf("获取请求列表失败: %w", err)
+	}
+
+	// 创建导出目录
+	exportDir := filepath.Join(fs.dataDir, "exports")
+	if err := os.MkdirAll(exportDir, 0755); err != nil {
+		return "", fmt.Errorf("创建导出目录失败: %w", err)
+	}
+
+	// 创建导出文件
+	exportPath := filepath.Join(exportDir, fmt.Sprintf("requests_export_%s.jsonl", time.Now().Format("20060102_150405")))
+	file, err := os.Create(exportPath)
+	if err != nil {
+		return "", fmt.Errorf("创建导出文件失败: %w", err)
+	}
+	defer file.Close()
+
+	// 写入JSONL格式
+	encoder := json.NewEncoder(file)
+	for _, req := range requests {
+		if err := encoder.Encode(req); err != nil {
+			return "", fmt.Errorf("写入请求数据失败: %w", err)
+		}
+	}
+
+	return exportPath, nil
 }
