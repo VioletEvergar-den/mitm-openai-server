@@ -41,3 +41,9 @@ dist/
 .vscode/
 *.swp
 *.swo 
+
+fake-openapi-server
+fake-openapi-server.exe
+
+
+
