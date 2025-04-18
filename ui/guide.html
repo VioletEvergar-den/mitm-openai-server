@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置指南 - 假OpenAPI服务器</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="container navbar-container">
+            <a href="index.html" class="navbar-brand">假OpenAPI服务器</a>
+            <ul class="navbar-menu">
+                <li class="navbar-item">
+                    <a href="index.html" class="navbar-link">请求列表</a>
+                </li>
+                <li class="navbar-item">
+                    <a href="guide.html" class="navbar-link">配置指南</a>
+                </li>
+                <li class="navbar-item">
+                    <a href="#" class="navbar-link logout-btn">退出登录</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <div class="container content" id="server-info">
+        <div class="card">
+            <h2 class="card-title">服务器信息</h2>
+            <table class="table">
+                <tr>
+                    <th>服务器版本</th>
+                    <td id="server-version">加载中...</td>
+                </tr>
+                <tr>
+                    <th>API认证</th>
+                    <td id="server-auth">加载中...</td>
+                </tr>
+                <tr>
+                    <th>OpenAPI URL</th>
+                    <td>
+                        <span id="server-url">加载中...</span>
+                        <a id="server-url-link" href="#" target="_blank">[打开]</a>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="card guide-section">
+            <h2 class="card-title">OpenAPI 配置指南</h2>
+            
+            <div class="guide-section">
+                <h3>什么是 OpenAPI?</h3>
+                <p>OpenAPI 规范（以前称为 Swagger）是定义 RESTful API 的标准格式。它允许开发人员和工具以与编程语言无关的方式描述、生成、使用和可视化 RESTful Web 服务。</p>
+            </div>
+            
+            <div class="guide-section">
+                <h3>如何配置您的客户端使用这个服务</h3>
+                <p>要在您的 OpenAPI/Swagger 客户端中使用这个服务，请按照以下步骤操作：</p>
+                
+                <ol style="margin-left: 20px; margin-bottom: 20px;">
+                    <li>在您的 OpenAPI 工具中，配置服务器 URL：<code id="server-url-code"></code></li>
+                    <li>如果启用了 API 认证，您需要配置认证信息</li>
+                    <li>导入 OpenAPI 定义或使用 URL 直接访问</li>
+                </ol>
+            </div>
+            
+            <div class="guide-section">
+                <h3>客户端示例</h3>
+                
+                <h4>curl 示例</h4>
+                <div class="code-block">
+curl -X POST "http://localhost:8080/v1/echo" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "测试消息"}'
+                </div>
+                
+                <h4>JavaScript 客户端示例</h4>
+                <div class="code-block">
+fetch('http://localhost:8080/v1/echo', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    message: '测试消息'
+  })
+})
+.then(response => response.json())
+.then(data => console.log(data));
+                </div>
+                
+                <h4>Python 客户端示例</h4>
+                <div class="code-block">
+import requests
+
+response = requests.post(
+    'http://localhost:8080/v1/echo',
+    json={'message': '测试消息'}
+)
+print(response.json())
+                </div>
+            </div>
+            
+            <div class="guide-section">
+                <h3>OpenAPI 查看工具</h3>
+                <p>您可以使用以下工具查看和测试 OpenAPI 规范：</p>
+                <ul style="margin-left: 20px;">
+                    <li><a href="https://swagger.io/tools/swagger-ui/" target="_blank">Swagger UI</a></li>
+                    <li><a href="https://github.com/Redocly/redoc" target="_blank">ReDoc</a></li>
+                    <li><a href="https://www.postman.com/" target="_blank">Postman</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // 设置服务器 URL
+        document.addEventListener('DOMContentLoaded', function() {
+            const serverUrlCode = document.getElementById('server-url-code');
+            if (serverUrlCode) {
+                const url = window.location.protocol + '//' + window.location.host;
+                serverUrlCode.textContent = url;
+            }
+        });
+    </script>
+</body>
+</html> 

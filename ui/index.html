@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>请求列表 - 假OpenAPI服务器</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="container navbar-container">
+            <a href="index.html" class="navbar-brand">假OpenAPI服务器</a>
+            <ul class="navbar-menu">
+                <li class="navbar-item">
+                    <a href="index.html" class="navbar-link">请求列表</a>
+                </li>
+                <li class="navbar-item">
+                    <a href="guide.html" class="navbar-link">配置指南</a>
+                </li>
+                <li class="navbar-item">
+                    <a href="#" class="navbar-link logout-btn">退出登录</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <div class="container content">
+        <div class="card">
+            <h2 class="card-title">捕获的请求列表</h2>
+            <p id="no-data-message" style="display: none;">暂无捕获的请求数据。</p>
+            
+            <table class="table" id="requests-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>时间</th>
+                        <th>方法</th>
+                        <th>路径</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 动态填充内容 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html> 
