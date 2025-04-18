@@ -14,6 +14,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
+	"github.com/llm-sec/mitm-openapi-server/pkg/utils"
 )
 
 // ServerConfig 存储服务器配置
@@ -219,7 +221,7 @@ func (s *Server) Run(addr string) error {
 	return s.router.Run(addr)
 }
 
-// apiMiddleware 处理并记录所有API请求
+// apiMiddleware API中间件，记录API调用
 func (s *Server) apiMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 跳过OpenAPI规范和内部API请求
@@ -280,13 +282,16 @@ func (s *Server) apiMiddleware() gin.HandlerFunc {
 		// 在代理模式下，转发请求到目标API
 		if s.config.ProxyMode && s.config.TargetURL != "" {
 			// 调用代理函数
-			proxyResp, err := sendProxyRequest(
+			proxyRespMap, err := utils.SendProxyRequest(
 				c.Request.Method,
 				s.config.TargetURL,
 				path,
 				req.Headers,
 				bodyBytes,
-				s.config,
+				s.config.TargetAuthType,
+				s.config.TargetUsername,
+				s.config.TargetPassword,
+				s.config.TargetToken,
 			)
 
 			if err != nil {
@@ -314,7 +319,12 @@ func (s *Server) apiMiddleware() gin.HandlerFunc {
 				return
 			}
 
-			// 记录代理响应
+			// 转换并记录代理响应
+			proxyResp := &ProxyResponse{
+				StatusCode: proxyRespMap["status_code"].(int),
+				Headers:    proxyRespMap["headers"].(map[string]string),
+				Body:       proxyRespMap["body"],
+			}
 			req.Response = proxyResp
 
 			// 保存请求记录
