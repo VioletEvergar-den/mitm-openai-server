@@ -33,13 +33,13 @@ func newProxyService(config Config) Service {
 
 	// 初始化支持的API
 	supportedAPI := map[string]bool{
-		"POST /v1/chat/completions":     true,
-		"POST /v1/completions":          true,
-		"POST /v1/embeddings":           true,
-		"POST /v1/images/generations":   true,
-		"POST /v1/audio/transcriptions": true,
-		"POST /v1/moderations":          true,
-		"GET /v1/models":                true,
+		"POST /chat/completions":     true,
+		"POST /completions":          true,
+		"POST /embeddings":           true,
+		"POST /images/generations":   true,
+		"POST /audio/transcriptions": true,
+		"POST /moderations":          true,
+		"GET /models":                true,
 	}
 
 	return &proxyService{
@@ -231,8 +231,11 @@ func (s *proxyService) HandleRequest(method, path string, headers, queryParams m
 
 // 检查API是否支持
 func (s *proxyService) isAPISupported(apiKey string) bool {
+	fmt.Printf("DEBUG: 检查API支持: %s\n", apiKey)
+
 	// 精确匹配
 	if s.supportedAPI[apiKey] {
+		fmt.Printf("DEBUG: API支持(精确匹配): %s\n", apiKey)
 		return true
 	}
 
@@ -242,11 +245,13 @@ func (s *proxyService) isAPISupported(apiKey string) bool {
 		if len(parts) == 2 {
 			method, path := parts[0], parts[1]
 			if strings.HasPrefix(apiKey, method+" "+path+"/") {
+				fmt.Printf("DEBUG: API支持(前缀匹配): %s 匹配 %s\n", apiKey, key)
 				return true
 			}
 		}
 	}
 
+	fmt.Printf("DEBUG: API不支持: %s\n", apiKey)
 	return false
 }
 
