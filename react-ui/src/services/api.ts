@@ -95,8 +95,15 @@ export const apiService = {
     try {
       const response = await API.get('/requests');
       // 处理 StandardResponse 格式
-      if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        return response.data.data;
+      if (response.data && response.data.data) {
+        // 如果data.requests存在且是数组，返回请求列表
+        if (response.data.data.requests && Array.isArray(response.data.data.requests)) {
+          return response.data.data.requests;
+        }
+        // 向后兼容: 如果data本身是数组，直接返回
+        if (Array.isArray(response.data.data)) {
+          return response.data.data;
+        }
       }
       // 兼容处理，如果response.data本身是数组，则直接返回
       if (Array.isArray(response.data)) {
