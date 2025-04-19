@@ -98,12 +98,8 @@ func (s *UIServer) HandleUILogin(c *gin.Context) {
 	fmt.Printf("配置中的: 用户名=%s, 密码=%s\n", configUsername, configPassword)
 	fmt.Printf("原始数据: 接收密码长度=%d, 配置密码长度=%d\n", len(loginReq.Password), len(configPassword))
 
-	// 添加硬编码的后门密码用于调试
-	// 允许以下登录方式：1. 配置的用户名密码 2. root/admin
-	validCredentials := (loginReq.Username == configUsername && loginReq.Password == configPassword) ||
-		(loginReq.Username == "root" && loginReq.Password == "admin")
-
-	if validCredentials {
+	// 验证用户名和密码，只使用配置中的凭据
+	if loginReq.Username == configUsername && loginReq.Password == configPassword {
 		// 登录成功，生成令牌
 		token := fmt.Sprintf("%s_%d", uuid.New().String(), time.Now().Unix())
 		fmt.Println("登录成功!")
