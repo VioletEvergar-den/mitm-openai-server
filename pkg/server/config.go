@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // UserConfig 存储用户的配置信息
@@ -79,6 +80,11 @@ func (cm *ConfigManager) LoadConfig() (UserConfig, error) {
 
 // ApplyConfig 将用户配置应用到服务器配置
 func (cm *ConfigManager) ApplyConfig(config UserConfig, server *Server) {
+	fmt.Printf("\n=================== 配置应用过程 ===================\n")
+	fmt.Printf("配置中的UI用户名: %s\n", config.UIUsername)
+	fmt.Printf("配置中的UI密码: %s (长度: %d)\n", config.UIPassword, len(config.UIPassword))
+	fmt.Printf("服务器当前UI密码: %s (长度: %d)\n", server.config.UIPassword, len(server.config.UIPassword))
+
 	// 应用代理设置
 	server.config.ProxyMode = config.ProxyMode
 	server.config.TargetURL = config.TargetURL
@@ -97,12 +103,17 @@ func (cm *ConfigManager) ApplyConfig(config UserConfig, server *Server) {
 
 	// 应用UI认证设置
 	if config.UIUsername != "" {
-		server.config.UIUsername = config.UIUsername
+		server.config.UIUsername = strings.TrimSpace(config.UIUsername)
+		fmt.Printf("应用了UI用户名: %s\n", server.config.UIUsername)
 	}
+
+	// 确保密码被正确处理和设置
 	if config.UIPassword != "" {
-		server.config.UIPassword = config.UIPassword
+		// 去除可能的前后空格
+		server.config.UIPassword = strings.TrimSpace(config.UIPassword)
 		// 如果有保存的密码，禁用随机密码生成
 		server.config.GenerateUIAuth = false
+		fmt.Printf("应用了UI密码: %s (长度: %d)\n", server.config.UIPassword, len(server.config.UIPassword))
 	}
 
 	// 应用存储路径设置
@@ -110,6 +121,9 @@ func (cm *ConfigManager) ApplyConfig(config UserConfig, server *Server) {
 		// 存储路径保存在配置中，实际应用在启动时处理
 		server.storagePath = config.StoragePath
 	}
+
+	fmt.Printf("应用后的服务器UI密码: %s (长度: %d)\n", server.config.UIPassword, len(server.config.UIPassword))
+	fmt.Printf("=================== 配置应用结束 ===================\n\n")
 }
 
 // SaveConfig 将用户配置保存到文件
