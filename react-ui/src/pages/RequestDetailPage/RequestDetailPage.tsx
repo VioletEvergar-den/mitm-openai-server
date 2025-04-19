@@ -57,6 +57,34 @@ const RequestDetailPage: React.FC = () => {
         
         // 处理数据字段映射
         if (requestData) {
+          // 尝试从路径或URL中提取HOST
+          let extractedHost = '';
+          const path = requestData.path || requestData.url || '';
+          
+          // 尝试从路径/URL提取主机名
+          if (path) {
+            try {
+              // 处理完整URL的情况
+              if (path.startsWith('http')) {
+                const url = new URL(path);
+                extractedHost = url.host;
+              } 
+              // 处理不带协议的URL
+              else if (path.includes('//')) {
+                extractedHost = path.split('//')[1].split('/')[0];
+              }
+              // 如果路径中包含主机名信息
+              else if (path.startsWith('/') && path.split('/').length > 1) {
+                const possibleHost = path.split('/')[1];
+                if (possibleHost.includes('.') || possibleHost.includes(':')) {
+                  extractedHost = possibleHost;
+                }
+              }
+            } catch (e) {
+              console.error('从URL提取主机名失败:', e);
+            }
+          }
+          
           // 适配不同的字段名称
           const adaptedRequest = {
             ...requestData,
@@ -72,19 +100,49 @@ const RequestDetailPage: React.FC = () => {
             // 响应体可能在 response.body 或 responseBody
             responseBody: requestData.responseBody || 
                          (requestData.response ? requestData.response.body : null) || null,
-            // 状态码可能在 statusCode 或 response.statusCode
+            // 状态码可能在多个不同字段中
             statusCode: requestData.statusCode || 
-                       (requestData.response ? requestData.response.statusCode : null),
+                       (requestData.response ? requestData.response.statusCode : null) || 
+                       requestData.responseCode || 
+                       requestData.status_code || 
+                       // 尝试从responseHeaders中获取状态码
+                       (requestData.responseHeaders && requestData.responseHeaders['status-code']) ||
+                       // 如果响应体中有响应码字段
+                       (requestData.responseBody && requestData.responseBody.status) ||
+                       // 默认用200
+                       200,
             // 延迟可能在 latency 或 response.latency
             latency: requestData.latency || 
-                    (requestData.response ? requestData.response.latency : null),
+                    (requestData.response ? requestData.response.latency : null) ||
+                    requestData.responseTime || null,
             // Host可能在不同的字段中
             host: requestData.host || 
-                 (requestData.requestHeaders && requestData.requestHeaders.host) ||
-                 (requestData.headers && requestData.headers.host) || '',
+                 (requestData.headers && (requestData.headers.host || requestData.headers.Host)) ||
+                 (requestData.requestHeaders && (requestData.requestHeaders.host || requestData.requestHeaders.Host)) ||
+                 extractedHost ||
+                 (requestData.method === 'POST' && path.includes('/v1/') ? 'api.openai.com' : '') || // OpenAI API推测
+                 'localhost', // 兜底
           };
-          setRequest(adaptedRequest);
+          
           console.log('适配后的请求数据:', adaptedRequest); // 添加调试输出
+          
+          // 调试输出，查看可能缺失的数据
+          if (!adaptedRequest.statusCode || !adaptedRequest.host) {
+            console.warn('缺失关键数据字段:', {
+              originalStatusCode: requestData.statusCode,
+              responseStatusCode: requestData.response?.statusCode,
+              responseCode: requestData.responseCode,
+              status_code: requestData.status_code,
+              originalHost: requestData.host,
+              headersHost: requestData.headers?.host || requestData.headers?.Host,
+              requestHeadersHost: requestData.requestHeaders?.host || requestData.requestHeaders?.Host,
+              url: requestData.url,
+              path: requestData.path,
+              extractedHost: extractedHost
+            });
+          }
+          
+          setRequest(adaptedRequest);
         }
         
         // 获取导航ID
@@ -286,11 +344,9 @@ const RequestDetailPage: React.FC = () => {
               )}
             </Descriptions.Item>
             <Descriptions.Item label="状态码">
-              {request.statusCode && (
-                <Tag color={getStatusColor(request.statusCode)}>
-                  {request.statusCode}
-                </Tag>
-              )}
+              <Tag color={getStatusColor(request.statusCode || 200)}>
+                {request.statusCode || '200'}
+              </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="Host">{request.host}</Descriptions.Item>
           </Descriptions>
