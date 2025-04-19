@@ -70,22 +70,6 @@ func (cm *ConfigManager) LoadConfig() (UserConfig, error) {
 	return config, nil
 }
 
-// SaveConfig 保存用户配置到文件
-func (cm *ConfigManager) SaveConfig(config UserConfig) error {
-	// 将配置序列化为JSON
-	data, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return fmt.Errorf("序列化配置失败: %v", err)
-	}
-
-	// 写入配置文件
-	if err := os.WriteFile(cm.configFile, data, 0644); err != nil {
-		return fmt.Errorf("写入配置文件失败: %v", err)
-	}
-
-	return nil
-}
-
 // ApplyConfig 将用户配置应用到服务器配置
 func (cm *ConfigManager) ApplyConfig(config UserConfig, server *Server) {
 	// 应用代理设置
@@ -102,17 +86,5 @@ func (cm *ConfigManager) ApplyConfig(config UserConfig, server *Server) {
 	}
 	if config.TargetToken != "" {
 		server.config.TargetToken = config.TargetToken
-	}
-}
-
-// GetConfigFromServer 从服务器配置中提取用户配置
-func (cm *ConfigManager) GetConfigFromServer(server *Server) UserConfig {
-	return UserConfig{
-		ProxyMode:      server.config.ProxyMode,
-		TargetURL:      server.config.TargetURL,
-		TargetAuthType: server.config.TargetAuthType,
-		TargetUsername: server.config.TargetUsername,
-		TargetPassword: server.config.TargetPassword,
-		TargetToken:    server.config.TargetToken,
 	}
 }
