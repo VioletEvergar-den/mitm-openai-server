@@ -29,7 +29,7 @@ type Server struct {
 	openaiService openai.Service        // OpenAI服务接口
 	configManager *ConfigManager        // 配置管理器
 	uiServer      api.UIServerInterface // UI服务器接口
-	openaiHandler *api.OpenAIHandler    // OpenAI API处理器
+	openaiHandler interface{}           // OpenAI API处理器，可以是api.OpenAIHandler或openai.Handler
 	storagePath   string                // 用户配置的数据存储路径
 }
 
@@ -132,8 +132,9 @@ func NewServerWithConfig(config api.ServerConfig) *Server {
 	// 创建UI服务器
 	server.uiServer = api.UIServerFactory(config.Storage, config, server.openaiService)
 
-	// 创建OpenAI处理器
-	server.openaiHandler = api.NewOpenAIHandler(config.Storage, server.openaiService)
+	// 创建OpenAI处理器 - 直接使用openai包中的Handler
+	openaiHandler := openai.NewHandler(config.Storage, server.openaiService)
+	server.openaiHandler = openaiHandler
 
 	// 设置路由
 	server.setupRoutes()
@@ -343,8 +344,12 @@ func (s *Server) setupOpenAIRoutes() {
 		return
 	}
 
-	// 使用OpenAI处理器设置路由
-	s.openaiHandler.SetupOpenAIRoutes(s.router, s.apiMiddleware())
+	// 使用OpenAI处理器设置路由 - 直接使用Handler的SetupRoutes方法
+	if handler, ok := s.openaiHandler.(*openai.Handler); ok {
+		handler.SetupRoutes(s.router, s.apiMiddleware())
+	} else {
+		fmt.Println("警告: openaiHandler类型错误，无法设置OpenAI路由")
+	}
 }
 
 // apiMiddleware API中间件
