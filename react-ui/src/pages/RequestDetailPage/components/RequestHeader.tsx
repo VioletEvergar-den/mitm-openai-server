@@ -2,6 +2,7 @@ import React from 'react';
 import { Space, Tag, Button, Tooltip, Typography } from 'antd';
 import { ArrowLeftOutlined, ArrowRightOutlined, DeleteOutlined } from '@ant-design/icons';
 import './RequestHeader.css';
+import ExportButton from './ExportButton';
 
 const { Text } = Typography;
 
@@ -14,6 +15,8 @@ interface RequestHeaderProps {
   navigateToNext: () => void;
   handleDelete: () => void;
   getMethodColor: (method: string) => string;
+  requestData: any;
+  requestId: string;
 }
 
 const RequestHeader: React.FC<RequestHeaderProps> = ({
@@ -24,7 +27,9 @@ const RequestHeader: React.FC<RequestHeaderProps> = ({
   navigateToPrevious,
   navigateToNext,
   handleDelete,
-  getMethodColor
+  getMethodColor,
+  requestData,
+  requestId
 }) => {
   return (
     <div className="detail-header">
@@ -37,34 +42,38 @@ const RequestHeader: React.FC<RequestHeaderProps> = ({
         </Space>
       </div>
       <div className="detail-actions">
-        <Space className="navigation-buttons">
-          <Tooltip title={prevRequestId ? "查看上一个请求" : "没有上一个请求"}>
-            <Button 
-              icon={<ArrowLeftOutlined />} 
-              onClick={navigateToPrevious}
-              disabled={!prevRequestId}
-              type="text"
-              className="nav-icon"
-            />
-          </Tooltip>
-          <Tooltip title={nextRequestId ? "查看下一个请求" : "没有下一个请求"}>
-            <Button 
-              icon={<ArrowRightOutlined />} 
-              onClick={navigateToNext}
-              disabled={!nextRequestId}
-              type="text"
-              className="nav-icon"
-            />
-          </Tooltip>
-          <Tooltip title="删除此请求">
-            <Button 
-              icon={<DeleteOutlined />} 
-              onClick={handleDelete}
-              danger
-              type="text"
-              className="nav-icon"
-            />
-          </Tooltip>
+        <Space>
+          <Space className="navigation-buttons">
+            <Tooltip title={prevRequestId ? "查看上一个请求" : "没有上一个请求"}>
+              <Button 
+                icon={<ArrowLeftOutlined />} 
+                onClick={navigateToPrevious}
+                disabled={!prevRequestId}
+                type="text"
+                className="nav-icon"
+              />
+            </Tooltip>
+            <Tooltip title={nextRequestId ? "查看下一个请求" : "没有下一个请求"}>
+              <Button 
+                icon={<ArrowRightOutlined />} 
+                onClick={navigateToNext}
+                disabled={!nextRequestId}
+                type="text"
+                className="nav-icon"
+              />
+            </Tooltip>
+            <Tooltip title="删除此请求">
+              <Button 
+                icon={<DeleteOutlined />} 
+                onClick={handleDelete}
+                danger
+                type="text"
+                className="nav-icon"
+              />
+            </Tooltip>
+          </Space>
+          
+          <ExportButton data={requestData} requestId={requestId} />
         </Space>
       </div>
     </div>

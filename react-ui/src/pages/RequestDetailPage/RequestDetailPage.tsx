@@ -87,6 +87,8 @@ const RequestDetailPage: React.FC = () => {
             navigateToNext={navigateToNext}
             handleDelete={handleDelete}
             getMethodColor={getMethodColor}
+            requestData={request}
+            requestId={request.id}
           />
 
           <RequestSummary
