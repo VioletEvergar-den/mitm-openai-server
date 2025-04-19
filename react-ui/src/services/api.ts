@@ -102,7 +102,7 @@ export const apiService = {
         }
         // 向后兼容: 如果data本身是数组，直接返回
         if (Array.isArray(response.data.data)) {
-          return response.data.data;
+        return response.data.data;
         }
       }
       // 兼容处理，如果response.data本身是数组，则直接返回
@@ -131,6 +131,54 @@ export const apiService = {
       return null;
     } catch (error) {
       console.error(`获取请求详情失败 ID=${id}:`, error);
+      return null;
+    }
+  },
+  
+  // 获取前一条请求
+  getPreviousRequestId: async (currentId: string): Promise<string | null> => {
+    try {
+      const response = await API.get(`/requests/navigation/prev/${currentId}`);
+      // 处理 StandardResponse 格式
+      if (response.data && response.data.data && response.data.data.id) {
+        return response.data.data.id;
+      }
+      
+      // 兼容处理：如果API不支持导航功能，则获取所有请求并在前端筛选
+      const requests = await apiService.getRequests();
+      const currentIndex = requests.findIndex(r => r.id === currentId);
+      
+      if (currentIndex > 0) {
+        return requests[currentIndex - 1].id;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`获取前一条请求失败 ID=${currentId}:`, error);
+      return null;
+    }
+  },
+  
+  // 获取后一条请求
+  getNextRequestId: async (currentId: string): Promise<string | null> => {
+    try {
+      const response = await API.get(`/requests/navigation/next/${currentId}`);
+      // 处理 StandardResponse 格式
+      if (response.data && response.data.data && response.data.data.id) {
+        return response.data.data.id;
+      }
+      
+      // 兼容处理：如果API不支持导航功能，则获取所有请求并在前端筛选
+      const requests = await apiService.getRequests();
+      const currentIndex = requests.findIndex(r => r.id === currentId);
+      
+      if (currentIndex !== -1 && currentIndex < requests.length - 1) {
+        return requests[currentIndex + 1].id;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`获取后一条请求失败 ID=${currentId}:`, error);
       return null;
     }
   },
@@ -223,6 +271,32 @@ export const apiService = {
     } catch (error) {
       console.error('保存代理配置失败:', error);
       return false;
+    }
+  },
+
+  getRequest: async (id: string): Promise<any> => {
+    try {
+      const response = await API.get(`/requests/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`获取请求失败 ID=${id}:`, error);
+      return null;
+    }
+  },
+
+  getRequestNavigationIds: async (id: string): Promise<{prevId: string | null, nextId: string | null}> => {
+    try {
+      // 尝试调用单独的导航接口
+      // 由于后端没有实现 /requests/${id}/navigation 接口，我们使用单独的上一个和下一个请求API
+      const [prevId, nextId] = await Promise.all([
+        apiService.getPreviousRequestId(id),
+        apiService.getNextRequestId(id)
+      ]);
+      
+      return { prevId, nextId };
+    } catch (error) {
+      console.error(`获取请求导航失败 ID=${id}:`, error);
+      return {prevId: null, nextId: null};
     }
   }
 }; 
