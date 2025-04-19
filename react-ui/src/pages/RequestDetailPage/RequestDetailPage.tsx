@@ -163,6 +163,36 @@ const RequestDetailPage: React.FC = () => {
             {request?.body ? JSON.stringify(request.body, null, 2) : ''}
           </pre>
         </div>
+
+        {request?.response && (
+          <div className="detail-section">
+            <h3 className="detail-section-title">响应内容</h3>
+            <div className="response-detail">
+              <div className="response-header">
+                <h4>状态码: <span className={`status-${Math.floor((request.response.statusCode || 0) / 100)}xx`}>{request.response.statusCode}</span></h4>
+                {request.response.latency && (
+                  <p>响应时间: {request.response.latency} ms</p>
+                )}
+              </div>
+              
+              {request.response.headers && Object.keys(request.response.headers).length > 0 && (
+                <div className="response-section">
+                  <h4>响应头</h4>
+                  <pre className="json-viewer">
+                    {JSON.stringify(request.response.headers, null, 2)}
+                  </pre>
+                </div>
+              )}
+              
+              <div className="response-section">
+                <h4>响应体</h4>
+                <pre className="json-viewer">
+                  {request.response.body ? JSON.stringify(request.response.body, null, 2) : ''}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

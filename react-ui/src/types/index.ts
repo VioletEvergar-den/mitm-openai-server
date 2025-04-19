@@ -8,6 +8,12 @@ export interface Request {
   headers: Record<string, string>;
   query: Record<string, string>;
   body?: any;
+  response?: {
+    statusCode: number;
+    headers: Record<string, string>;
+    body: any;
+    latency?: number;
+  };
 }
 
 // 存储统计信息
