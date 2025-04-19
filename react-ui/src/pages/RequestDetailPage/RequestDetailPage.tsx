@@ -2,13 +2,18 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/api';
 import './RequestDetailPage.css';
-import { Card, Button, Tabs, Typography, Tag, Space, Divider, Descriptions, Spin, Result, message, Tooltip, Modal } from 'antd';
-import { ArrowLeftOutlined, ArrowRightOutlined, DeleteOutlined, ExclamationCircleOutlined, ClockCircleOutlined, CodeOutlined, CopyOutlined } from '@ant-design/icons';
-import JSONPretty from 'react-json-pretty';
-import 'react-json-pretty/themes/monikai.css';
+import { Tabs, message, Modal, Divider, Card } from 'antd';
+import { ExclamationCircleOutlined } from '@ant-design/icons';
 import Layout from '../../components/Layout';
+import {
+  RequestHeader,
+  RequestSummary,
+  RequestContent,
+  ResponseContent,
+  LoadingState,
+  ErrorState
+} from './components';
 
-const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 const { confirm } = Modal;
 
@@ -45,15 +50,15 @@ const RequestDetailPage: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-    if (!id) return;
-    
-    setLoading(true);
+      if (!id) return;
+      
+      setLoading(true);
       setError(null);
       
-    try {
+      try {
         // 获取当前请求详情
         const requestData: any = await apiService.getRequestById(id);
-        console.log('请求详情数据:', requestData); // 添加调试输出
+        console.log('请求详情数据:', requestData); 
         
         // 处理数据字段映射
         if (requestData) {
@@ -79,7 +84,7 @@ const RequestDetailPage: React.FC = () => {
                 if (possibleHost.includes('.') || possibleHost.includes(':')) {
                   extractedHost = possibleHost;
                 }
-      }
+              }
             } catch (e) {
               console.error('从URL提取主机名失败:', e);
             }
@@ -105,11 +110,8 @@ const RequestDetailPage: React.FC = () => {
                        (requestData.response ? requestData.response.statusCode : null) || 
                        requestData.responseCode || 
                        requestData.status_code || 
-                       // 尝试从responseHeaders中获取状态码
                        (requestData.responseHeaders && requestData.responseHeaders['status-code']) ||
-                       // 如果响应体中有响应码字段
                        (requestData.responseBody && requestData.responseBody.status) ||
-                       // 默认用200
                        200,
             // 延迟可能在 latency 或 response.latency
             latency: requestData.latency || 
@@ -120,27 +122,9 @@ const RequestDetailPage: React.FC = () => {
                  (requestData.headers && (requestData.headers.host || requestData.headers.Host)) ||
                  (requestData.requestHeaders && (requestData.requestHeaders.host || requestData.requestHeaders.Host)) ||
                  extractedHost ||
-                 (requestData.method === 'POST' && path.includes('/v1/') ? 'api.openai.com' : '') || // OpenAI API推测
-                 'localhost', // 兜底
+                 (requestData.method === 'POST' && path.includes('/v1/') ? 'api.openai.com' : '') || 
+                 'localhost',
           };
-          
-          console.log('适配后的请求数据:', adaptedRequest); // 添加调试输出
-          
-          // 调试输出，查看可能缺失的数据
-          if (!adaptedRequest.statusCode || !adaptedRequest.host) {
-            console.warn('缺失关键数据字段:', {
-              originalStatusCode: requestData.statusCode,
-              responseStatusCode: requestData.response?.statusCode,
-              responseCode: requestData.responseCode,
-              status_code: requestData.status_code,
-              originalHost: requestData.host,
-              headersHost: requestData.headers?.host || requestData.headers?.Host,
-              requestHeadersHost: requestData.requestHeaders?.host || requestData.requestHeaders?.Host,
-              url: requestData.url,
-              path: requestData.path,
-              extractedHost: extractedHost
-            });
-          }
           
           setRequest(adaptedRequest);
         }
@@ -152,15 +136,14 @@ const RequestDetailPage: React.FC = () => {
           setNextRequestId(nextId);
         } catch (navErr) {
           console.error('获取导航ID失败:', navErr);
-          // 导航失败不阻止页面显示
         }
       } catch (err) {
         console.error('Failed to fetch request data:', err);
         setError('无法加载请求详情');
-    } finally {
-      setLoading(false);
-    }
-  };
+      } finally {
+        setLoading(false);
+      }
+    };
 
     fetchData();
   }, [id]);
@@ -168,29 +151,24 @@ const RequestDetailPage: React.FC = () => {
   // 添加键盘快捷键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 避免在输入框中触发
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-      return;
-    }
+        return;
+      }
     
-      // 左方向键导航到上一个请求
       if (e.key === 'ArrowLeft' && prevRequestId) {
         navigateToPrevious();
       }
-      // 右方向键导航到下一个请求
       else if (e.key === 'ArrowRight' && nextRequestId) {
         navigateToNext();
       }
     };
 
-    // 添加键盘事件监听
     window.addEventListener('keydown', handleKeyDown);
 
-    // 清理函数
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [prevRequestId, nextRequestId, navigateToPrevious, navigateToNext]); // 添加导航函数到依赖列表
+  }, [prevRequestId, nextRequestId, navigateToPrevious, navigateToNext]);
 
   const handleDelete = () => {
     if (!id) return;
@@ -231,46 +209,6 @@ const RequestDetailPage: React.FC = () => {
       });
   };
 
-  // 生成卡片额外操作区域（带复制按钮）
-  const renderCardExtra = (title: string, content: any) => (
-    <Tooltip title={`复制${title}内容到剪贴板`} placement="left">
-      <Button 
-        type="text" 
-        icon={<CopyOutlined />} 
-        onClick={() => copyToClipboard(content)}
-        size="small"
-        title={`复制${title}`}
-      />
-    </Tooltip>
-  );
-
-  if (loading) {
-    return (
-      <Layout>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-          <Spin size="large" tip="加载请求详情..." />
-        </div>
-      </Layout>
-    );
-  }
-
-  if (error || !request) {
-    return (
-      <Layout>
-        <Result
-          status="error"
-          title="请求加载失败"
-          subTitle={error || "无法找到请求详情"}
-          extra={
-            <Button type="primary" onClick={() => navigate('/requests')}>
-              返回请求列表
-            </Button>
-          }
-        />
-      </Layout>
-    );
-  }
-
   // 请求方法对应的颜色
   const getMethodColor = (method: string) => {
     const methodMap: Record<string, string> = {
@@ -292,157 +230,66 @@ const RequestDetailPage: React.FC = () => {
     return 'default';
   };
 
+  if (loading) {
+    return (
+      <Layout>
+        <LoadingState />
+      </Layout>
+    );
+  }
+
+  if (error || !request) {
+    return (
+      <Layout>
+        <ErrorState errorMessage={error || undefined} />
+      </Layout>
+    );
+  }
+
   return (
     <Layout title="请求详情">
       <div className="request-detail-container">
-        <Card
-          title={
-            <Space>
-              <Tag color={getMethodColor(request.method)}>{request.method}</Tag>
-              <Text ellipsis style={{ maxWidth: '500px' }}>
-                {request.path}
-              </Text>
-            </Space>
-          }
-          extra={
-            <Space>
-              <Tooltip title={prevRequestId ? "查看上一个请求" : "没有上一个请求"}>
-                <Button 
-                  icon={<ArrowLeftOutlined />} 
-                  onClick={navigateToPrevious}
-                  disabled={!prevRequestId}
-                  type="text"
-                />
-              </Tooltip>
-              <Tooltip title={nextRequestId ? "查看下一个请求" : "没有下一个请求"}>
-                <Button 
-                  icon={<ArrowRightOutlined />} 
-                  onClick={navigateToNext}
-                  disabled={!nextRequestId}
-                  type="text"
-                />
-              </Tooltip>
-              <Tooltip title="删除此请求">
-                <Button 
-                  icon={<DeleteOutlined />} 
-              onClick={handleDelete}
-                  danger
-                  type="text"
-                />
-              </Tooltip>
-            </Space>
-          }
-        >
-          <Descriptions bordered column={{ xxl: 4, xl: 3, lg: 3, md: 2, sm: 1, xs: 1 }}>
-            <Descriptions.Item label="请求ID">{request.id}</Descriptions.Item>
-            <Descriptions.Item label="时间">
-              {new Date(request.timestamp).toLocaleString()}
-              {request.latency && (
-                <Tag color="blue" className="latency-badge">
-                  <ClockCircleOutlined /> {request.latency}ms
-                </Tag>
-              )}
-            </Descriptions.Item>
-            <Descriptions.Item label="状态码">
-              <Tag color={getStatusColor(request.statusCode || 200)}>
-                {request.statusCode || '200'}
-              </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="Host">{request.host}</Descriptions.Item>
-          </Descriptions>
+        <Card>
+          <RequestHeader
+            method={request.method}
+            path={request.path}
+            prevRequestId={prevRequestId}
+            nextRequestId={nextRequestId}
+            navigateToPrevious={navigateToPrevious}
+            navigateToNext={navigateToNext}
+            handleDelete={handleDelete}
+            getMethodColor={getMethodColor}
+          />
+
+          <RequestSummary
+            id={request.id}
+            timestamp={request.timestamp}
+            latency={request.latency}
+            statusCode={request.statusCode}
+            host={request.host}
+            getStatusColor={getStatusColor}
+          />
           
           <Divider />
 
           <Tabs defaultActiveKey="1">
             <TabPane tab="请求" key="1">
-              <Card 
-                size="small" 
-                title="请求头"
-                extra={renderCardExtra('请求头', request.requestHeaders)}
-            >
-                {request.requestHeaders && Object.keys(request.requestHeaders).length > 0 ? (
-                  <div className="json-viewer">
-                    <JSONPretty 
-                      id="json-pretty-headers"
-                      data={request.requestHeaders}
-                      theme={jsonPrettyTheme}
-                    />
-          </div>
-                ) : (
-                  <Text type="secondary">无请求头</Text>
-                )}
-              </Card>
-              
-              {request.queryParams && Object.keys(request.queryParams).length > 0 && (
-                <Card 
-                  size="small" 
-                  title="查询参数" 
-                  style={{ marginTop: 16 }}
-                  extra={renderCardExtra('查询参数', request.queryParams)}
-                >
-                  <div className="json-viewer">
-                    <JSONPretty 
-                      id="json-pretty-params"
-                      data={request.queryParams}
-                      theme={jsonPrettyTheme}
-                    />
-        </div>
-                </Card>
-              )}
-              
-              {request.requestBody && (
-                <Card 
-                  size="small" 
-                  title="请求体" 
-                  style={{ marginTop: 16 }}
-                  extra={renderCardExtra('请求体', request.requestBody)}
-                >
-                  <div className="json-viewer">
-                    <JSONPretty 
-                      id="json-pretty-request-body"
-                      data={request.requestBody}
-                      theme={jsonPrettyTheme}
-                    />
-        </div>
-                </Card>
-              )}
+              <RequestContent
+                requestHeaders={request.requestHeaders}
+                queryParams={request.queryParams}
+                requestBody={request.requestBody}
+                copyToClipboard={copyToClipboard}
+                jsonPrettyTheme={jsonPrettyTheme}
+              />
             </TabPane>
             
             <TabPane tab="响应" key="2">
-              <Card 
-                size="small" 
-                title="响应头"
-                extra={renderCardExtra('响应头', request.responseHeaders)}
-              >
-                {request.responseHeaders && Object.keys(request.responseHeaders).length > 0 ? (
-                  <div className="json-viewer">
-                    <JSONPretty 
-                      id="json-pretty-response-headers"
-                      data={request.responseHeaders}
-                      theme={jsonPrettyTheme}
-                    />
-        </div>
-                ) : (
-                  <Text type="secondary">无响应头</Text>
-                )}
-              </Card>
-              
-              {request.responseBody && (
-                <Card 
-                  size="small" 
-                  title="响应体" 
-                  style={{ marginTop: 16 }}
-                  extra={renderCardExtra('响应体', request.responseBody)}
-                >
-                  <div className="json-viewer">
-                    <JSONPretty 
-                      id="json-pretty-response-body"
-                      data={request.responseBody}
-                      theme={jsonPrettyTheme}
-                    />
-        </div>
-                </Card>
-              )}
+              <ResponseContent
+                responseHeaders={request.responseHeaders}
+                responseBody={request.responseBody}
+                copyToClipboard={copyToClipboard}
+                jsonPrettyTheme={jsonPrettyTheme}
+              />
             </TabPane>
           </Tabs>
         </Card>
