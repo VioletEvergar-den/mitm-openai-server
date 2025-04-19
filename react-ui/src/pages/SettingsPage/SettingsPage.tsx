@@ -22,6 +22,9 @@ const SettingsPage: React.FC = () => {
     storage: true
   });
   
+  // 保存状态
+  const [saving, setSaving] = useState(false);
+  
   const { addNotification } = useNotification();
 
   // 加载代理配置
@@ -65,18 +68,21 @@ const SettingsPage: React.FC = () => {
   // 处理代理配置表单提交
   const handleProxySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
     
     try {
       const success = await apiService.saveProxyConfig(proxyConfig);
       
       if (success) {
-        addNotification('代理设置已保存');
+        addNotification('代理设置已保存', 'success');
       } else {
         addNotification('保存代理设置失败', 'danger');
       }
     } catch (error) {
       console.error('保存代理设置失败:', error);
       addNotification('保存代理设置失败', 'danger');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -100,7 +106,7 @@ const SettingsPage: React.FC = () => {
       const success = await apiService.clearAllRequests();
       
       if (success) {
-        addNotification('所有请求数据已清空');
+        addNotification('所有请求数据已清空', 'success');
         loadStorageStats();
       } else {
         addNotification('清空请求数据失败', 'danger');
@@ -118,18 +124,18 @@ const SettingsPage: React.FC = () => {
 
   return (
     <Layout title="系统设置">
-      <div className="card">
-        <h2 className="card-title">系统设置</h2>
+      <div className="settings-container">
+        <div className="settings-header">
+          <h1>系统设置</h1>
+          <p className="settings-subtitle">配置代理服务器和管理捕获的数据</p>
+        </div>
         
         {/* 代理服务器配置 */}
-        <div className="settings-section">
-          <h3>代理服务器配置</h3>
-          {loading.proxy ? (
-            <p>正在加载代理配置...</p>
-          ) : (
-            <form id="proxy-form" className="settings-form" onSubmit={handleProxySubmit}>
-              <div className="form-group">
-                <label htmlFor="proxy-enabled">
+        <div className="settings-card">
+          <div className="settings-card-header">
+            <h2>代理服务器配置</h2>
+            {!loading.proxy && (
+              <div className="toggle-switch">
                   <input 
                     type="checkbox" 
                     id="proxy-enabled" 
@@ -137,43 +143,73 @@ const SettingsPage: React.FC = () => {
                     checked={proxyConfig.enabled}
                     onChange={handleChange}
                   />
-                  启用代理模式
+                <label htmlFor="proxy-enabled">
+                  <span className="toggle-track">
+                    <span className="toggle-indicator"></span>
+                  </span>
+                  <span className="toggle-label">{proxyConfig.enabled ? '已启用' : '已禁用'}</span>
                 </label>
-                <p className="form-hint">启用代理模式后，将转发请求到下面配置的目标API服务器</p>
+              </div>
+            )}
+          </div>
+          
+          {loading.proxy ? (
+            <div className="loading-indicator">
+              <div className="spinner"></div>
+              <p>正在加载代理配置...</p>
+            </div>
+          ) : (
+            <form id="proxy-form" className="settings-form" onSubmit={handleProxySubmit}>
+              <div className="form-info">
+                {proxyConfig.enabled ? (
+                  <p>代理模式已启用，请求将转发到目标API服务器</p>
+                ) : (
+                  <p>代理模式已禁用，服务器将返回模拟数据</p>
+                )}
               </div>
               
               <div className="form-group">
                 <label htmlFor="target-url">目标API服务器地址</label>
+                <div className="input-container">
                 <input 
                   type="url" 
                   id="target-url" 
                   name="targetURL"
-                  placeholder="https://api.example.com" 
+                    placeholder="https://api.openai.com" 
                   className="form-control"
                   value={proxyConfig.targetURL}
                   onChange={handleChange}
+                    disabled={!proxyConfig.enabled}
                 />
+                  <span className="input-icon">🔗</span>
+                </div>
+                <div className="form-hint">填写目标OpenAI API服务器完整地址</div>
               </div>
               
               <div className="form-group">
                 <label htmlFor="auth-type">认证类型</label>
+                <div className="select-container">
                 <select 
                   id="auth-type" 
                   name="authType" 
                   className="form-control"
                   value={proxyConfig.authType}
                   onChange={handleChange}
+                    disabled={!proxyConfig.enabled}
                 >
                   <option value="none">无认证</option>
                   <option value="basic">基本认证 (用户名/密码)</option>
                   <option value="token">令牌认证</option>
                 </select>
+                  <span className="select-arrow">▼</span>
+                </div>
               </div>
               
               {proxyConfig.authType === 'basic' && (
                 <div className="auth-fields">
                   <div className="form-group">
                     <label htmlFor="username">用户名</label>
+                    <div className="input-container">
                     <input 
                       type="text" 
                       id="username" 
@@ -181,10 +217,14 @@ const SettingsPage: React.FC = () => {
                       className="form-control"
                       value={proxyConfig.username || ''}
                       onChange={handleChange}
+                        disabled={!proxyConfig.enabled}
                     />
+                      <span className="input-icon">👤</span>
+                    </div>
                   </div>
                   <div className="form-group">
                     <label htmlFor="password">密码</label>
+                    <div className="input-container">
                     <input 
                       type="password" 
                       id="password" 
@@ -192,7 +232,10 @@ const SettingsPage: React.FC = () => {
                       className="form-control"
                       value={proxyConfig.password || ''}
                       onChange={handleChange}
+                        disabled={!proxyConfig.enabled}
                     />
+                      <span className="input-icon">🔒</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -201,6 +244,7 @@ const SettingsPage: React.FC = () => {
                 <div className="auth-fields">
                   <div className="form-group">
                     <label htmlFor="token">访问令牌</label>
+                    <div className="input-container">
                     <input 
                       type="password" 
                       id="token" 
@@ -208,43 +252,100 @@ const SettingsPage: React.FC = () => {
                       className="form-control"
                       value={proxyConfig.token || ''}
                       onChange={handleChange}
+                        disabled={!proxyConfig.enabled}
                     />
+                      <span className="input-icon">🔑</span>
+                    </div>
+                    <div className="form-hint">例如：sk-xxxxxxxxxxxxxxxxxxxx</div>
                   </div>
                 </div>
               )}
               
-              <div className="form-group">
-                <button type="submit" className="btn btn-primary">保存配置</button>
+              <div className="form-actions">
+                <button 
+                  type="submit" 
+                  className="btn-primary"
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <>
+                      <div className="btn-spinner"></div>
+                      <span>保存中...</span>
+                    </>
+                  ) : '保存配置'}
+                </button>
               </div>
             </form>
           )}
         </div>
         
         {/* 存储管理 */}
-        <div className="settings-section">
-          <h3>存储管理</h3>
+        <div className="settings-card">
+          <div className="settings-card-header">
+            <h2>数据存储管理</h2>
+          </div>
+          
           {loading.storage ? (
+            <div className="loading-indicator">
+              <div className="spinner"></div>
             <p>正在加载存储信息...</p>
+            </div>
           ) : storageStats ? (
-            <div>
-              <div className="settings-info">
-                <p>共捕获了 <strong>{storageStats.totalRequests}</strong> 个请求</p>
-                <p>总数据大小: <strong>{utils.formatFileSize(storageStats.totalSizeBytes)}</strong></p>
+            <div className="storage-content">
+              <div className="stats-container">
+                <div className="stat-card">
+                  <div className="stat-icon">📊</div>
+                  <div className="stat-value">{storageStats.totalRequests}</div>
+                  <div className="stat-label">捕获的请求</div>
+                </div>
+                
+                <div className="stat-card">
+                  <div className="stat-icon">💾</div>
+                  <div className="stat-value">{utils.formatFileSize(storageStats.totalSizeBytes)}</div>
+                  <div className="stat-label">总数据大小</div>
+                </div>
+                
                 {storageStats.firstRequestTime && (
-                  <p>首次请求时间: <strong>{utils.formatDateTime(storageStats.firstRequestTime)}</strong></p>
+                  <div className="stat-card">
+                    <div className="stat-icon">🕒</div>
+                    <div className="stat-value">{new Date(storageStats.firstRequestTime).toLocaleDateString()}</div>
+                    <div className="stat-label">首次捕获时间</div>
+                  </div>
                 )}
+                
                 {storageStats.lastRequestTime && (
-                  <p>最近请求时间: <strong>{utils.formatDateTime(storageStats.lastRequestTime)}</strong></p>
+                  <div className="stat-card">
+                    <div className="stat-icon">🕘</div>
+                    <div className="stat-value">{new Date(storageStats.lastRequestTime).toLocaleDateString()}</div>
+                    <div className="stat-label">最近捕获时间</div>
+                  </div>
                 )}
               </div>
               
-              <div className="settings-actions">
-                <button onClick={handleExportData} className="btn">导出数据 (JSONL)</button>
-                <button onClick={handleClearData} className="btn btn-danger">清空所有请求数据</button>
+              <div className="storage-actions">
+                <button 
+                  onClick={handleExportData} 
+                  className="btn-secondary"
+                  disabled={storageStats.totalRequests === 0}
+                >
+                  <span className="btn-icon">📤</span>
+                  导出数据
+                </button>
+                <button 
+                  onClick={handleClearData} 
+                  className="btn-danger"
+                  disabled={storageStats.totalRequests === 0}
+                >
+                  <span className="btn-icon">🗑️</span>
+                  清空所有数据
+                </button>
               </div>
             </div>
           ) : (
+            <div className="error-state">
             <p>无法获取存储信息</p>
+              <button onClick={loadStorageStats} className="btn-secondary">重试</button>
+            </div>
           )}
         </div>
       </div>
