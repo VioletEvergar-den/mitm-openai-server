@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import JsonCardView from './JsonCardView';
-import { Tag } from 'antd';
 import './ResponseContent.css';
 
 interface ResponseContentProps {
@@ -51,25 +50,21 @@ const ResponseContent: React.FC<ResponseContentProps> = ({
 
   return (
     <div className="response-content">
-      <div className="response-section">
-        <JsonCardView
-          title="响应头"
-          data={formattedHeaders}
-          copyToClipboard={copyToClipboard}
-          jsonPrettyTheme={jsonPrettyTheme}
-        />
-      </div>
+      <JsonCardView
+        title="响应头"
+        data={formattedHeaders}
+        copyToClipboard={copyToClipboard}
+        jsonPrettyTheme={jsonPrettyTheme}
+      />
       
       {formattedBody && (
-        <div className="response-section">
-          <JsonCardView
-            title="响应体"
-            data={formattedBody}
-            copyToClipboard={copyToClipboard}
-            style={{ marginTop: 16 }}
-            jsonPrettyTheme={jsonPrettyTheme}
-          />
-        </div>
+        <JsonCardView
+          title="响应体"
+          data={formattedBody}
+          copyToClipboard={copyToClipboard}
+          style={{ marginTop: 16 }}
+          jsonPrettyTheme={jsonPrettyTheme}
+        />
       )}
     </div>
   );
