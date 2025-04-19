@@ -1,9 +1,10 @@
 import React from 'react';
 import { Layout as AntLayout, theme } from 'antd';
 import Navbar from '../Navbar/Navbar';
+import Footer from '../Footer';
 import './Layout.css';
 
-const { Header, Content, Footer } = AntLayout;
+const { Header, Content } = AntLayout;
 
 const Layout: React.FC<{
   children: React.ReactNode;
@@ -39,9 +40,7 @@ const Layout: React.FC<{
           {children}
         </div>
       </Content>
-      <Footer style={{ textAlign: 'center' }}>
-        中间人OpenAI API服务器 ©{new Date().getFullYear()} Created by llm-sec Team
-      </Footer>
+      <Footer />
     </AntLayout>
   );
 };
