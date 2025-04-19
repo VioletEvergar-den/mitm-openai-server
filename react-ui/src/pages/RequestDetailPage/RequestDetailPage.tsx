@@ -177,7 +177,7 @@ const RequestDetailPage: React.FC = () => {
             <h3 className="detail-section-title">响应内容</h3>
             <div className="response-detail">
               <div className="response-header">
-                <h4>状态码: <span className={`status-${Math.floor((request.response.statusCode || 0) / 100)}xx`}>{request.response.statusCode}</span></h4>
+                <h4>状态码: <span className={`status-${Math.floor(((request.response.statusCode || 200) / 100))}xx`}>{request.response.statusCode || 200}</span></h4>
                 {request.response.latency && (
                   <p>响应时间: {request.response.latency} ms</p>
                 )}
