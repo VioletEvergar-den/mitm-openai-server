@@ -30,6 +30,7 @@ type Server struct {
 	configManager *ConfigManager        // 配置管理器
 	uiServer      api.UIServerInterface // UI服务器接口
 	openaiHandler *api.OpenAIHandler    // OpenAI API处理器
+	storagePath   string                // 用户配置的数据存储路径
 }
 
 // NewServer 创建一个新的服务器实例
