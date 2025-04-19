@@ -20,6 +20,10 @@ type UserConfig struct {
 	// 数据存储设置
 	StoragePath string `json:"storage_path,omitempty"`
 
+	// UI认证设置
+	UIUsername string `json:"ui_username,omitempty"`
+	UIPassword string `json:"ui_password,omitempty"`
+
 	// 其他用户设置可以在此添加
 }
 
@@ -91,9 +95,51 @@ func (cm *ConfigManager) ApplyConfig(config UserConfig, server *Server) {
 		server.config.TargetToken = config.TargetToken
 	}
 
+	// 应用UI认证设置
+	if config.UIUsername != "" {
+		server.config.UIUsername = config.UIUsername
+	}
+	if config.UIPassword != "" {
+		server.config.UIPassword = config.UIPassword
+		// 如果有保存的密码，禁用随机密码生成
+		server.config.GenerateUIAuth = false
+	}
+
 	// 应用存储路径设置
 	if config.StoragePath != "" {
 		// 存储路径保存在配置中，实际应用在启动时处理
 		server.storagePath = config.StoragePath
 	}
+}
+
+// SaveConfig 将用户配置保存到文件
+func (cm *ConfigManager) SaveConfig(config UserConfig) error {
+	// 将配置转换为JSON
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("序列化配置失败: %v", err)
+	}
+
+	// 写入文件
+	if err := os.WriteFile(cm.configFile, data, 0600); err != nil {
+		return fmt.Errorf("写入配置文件失败: %v", err)
+	}
+
+	return nil
+}
+
+// SaveUICredentials 保存UI认证凭据到配置文件
+func (cm *ConfigManager) SaveUICredentials(username, password string) error {
+	// 加载当前配置
+	config, err := cm.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("加载配置失败: %v", err)
+	}
+
+	// 更新认证凭据
+	config.UIUsername = username
+	config.UIPassword = password
+
+	// 保存配置
+	return cm.SaveConfig(config)
 }
