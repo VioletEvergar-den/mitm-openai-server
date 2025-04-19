@@ -1,101 +1,229 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Layout from '../../components/Layout/Layout';
 import './GuidePage.css';
 
 const GuidePage: React.FC = () => {
+  const [showToken, setShowToken] = useState(false);
+  // 使用正确的后端服务器地址和端口
+  const backendUrl = window.location.hostname === 'localhost' ? 
+    'http://localhost:8080' : window.location.origin;
+  const apiUrl = '/v1';
+  const fullApiUrl = backendUrl + apiUrl; // 完整的API地址，包括/v1路径
+  const token = 'Bearer mt-mitm-server-token'; // 实际应该从后端API获取
+
+  // 对话状态
+  const [messages, setMessages] = useState<Array<{role: string, content: string}>>([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  // 发送消息到MITM OpenAI Server
+  const sendMessage = async () => {
+    if (!inputMessage.trim()) return;
+    
+    // 添加用户消息到历史
+    const userMessage = { role: 'user', content: inputMessage };
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    setInputMessage('');
+    setIsLoading(true);
+    
+    try {
+      // 构建请求数据，完全符合OpenAI API规范
+      const requestData = {
+        model: 'gpt-3.5-turbo',
+        messages: updatedMessages,
+        temperature: 0.7
+      };
+      
+      // 发送请求到MITM OpenAI Server
+      // 这里使用MITM UI API的chat接口，而不是直接请求OpenAI API
+      const response = await fetch(`/ui/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token
+        },
+        credentials: 'include',
+        body: JSON.stringify(requestData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`请求失败: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // 添加助手响应到历史，处理标准OpenAI API响应格式
+      if (data.choices && data.choices.length > 0) {
+        const assistantMessage = data.choices[0].message;
+        setMessages([...updatedMessages, assistantMessage]);
+      }
+    } catch (error) {
+      console.error('请求MITM OpenAI API失败:', error);
+      // 添加错误消息
+      setMessages([
+        ...updatedMessages, 
+        { 
+          role: 'assistant', 
+          content: `发生错误: ${error instanceof Error ? error.message : '未知错误'}`
+        }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 处理按回车键发送
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
   return (
-    <Layout title="配置指南">
-      <div className="card">
-        <h2 className="card-title">配置指南</h2>
-        
-        <div className="guide-section">
-          <h3>服务器配置</h3>
-          <p>
-            使用此中间人OpenAI API服务器，您需要先进行服务器配置。在"系统设置"页面中，您可以配置代理模式和目标API服务器地址。
+    <Layout title="OpenAI API配置教程">
+      <div className="simple-guide-container">
+        <div className="guide-card">
+          <h2>OpenAI API配置指南</h2>
+          <p className="guide-description">
+            要使用此中间人服务器，您需要将OpenAI客户端配置为使用以下API地址和认证Token。
+            这样您的所有API请求将通过此服务器，并被记录下来供后续分析。
           </p>
-          <p>
-            启用代理模式后，服务器将转发API请求到目标API服务器，并记录请求和响应内容。
-          </p>
+
+          <div className="config-section">
+            <h3>1. API地址</h3>
+            <div className="config-item">
+              <div className="input-with-copy">
+                <input 
+                  type="text" 
+                  value={fullApiUrl} 
+                  readOnly 
+                  className="config-input"
+                />
+                <button 
+                  className="copy-button"
+                  onClick={() => copyToClipboard(fullApiUrl)}
+                  title="复制到剪贴板"
+                >
+                  复制
+                </button>
+              </div>
+              <p className="config-hint">在您的OpenAI客户端中，将baseURL设置为上述地址</p>
+            </div>
+          </div>
+
+          <div className="config-section">
+            <h3>2. 认证Token</h3>
+            <div className="config-item">
+              <div className="input-with-copy">
+                <input 
+                  type={showToken ? "text" : "password"}
+                  value={token} 
+                  readOnly 
+                  className="config-input"
+                />
+                <button 
+                  className="button-secondary"
+                  onClick={() => setShowToken(!showToken)}
+                >
+                  {showToken ? "隐藏" : "显示"}
+                </button>
+                <button 
+                  className="copy-button"
+                  onClick={() => copyToClipboard(token)}
+                  title="复制到剪贴板"
+                >
+                  复制
+                </button>
+              </div>
+              <p className="config-hint">在您的OpenAI客户端中，使用此Token作为API密钥</p>
+            </div>
+          </div>
+
+          {/* 添加测试提示信息 */}
+          <div className="config-section">
+            <h3>3. 验证API连接</h3>
+            <div className="config-item">
+              <p className="config-hint">您可以使用以下命令测试API连接：</p>
+              <div className="code-block">
+                <code>
+                  curl -X GET {fullApiUrl}/models -H "Authorization: {token}"
+                </code>
+                <button 
+                  className="copy-button"
+                  onClick={() => copyToClipboard(`curl -X GET ${fullApiUrl}/models -H "Authorization: ${token}"`)}
+                  title="复制到剪贴板"
+                >
+                  复制
+                </button>
+              </div>
+              <p className="config-hint">或使用下方的测试对话框直接测试聊天功能</p>
+            </div>
+          </div>
+
+          {/* 测试对话框 */}
+          <div className="chat-test-section">
+            <h3>测试对话</h3>
+            <p className="chat-description">
+              在下方与MITM OpenAI Server进行对话测试，验证服务器是否正常工作。
+            </p>
+            
+            <div className="chat-container">
+              <div className="messages-container">
+                {messages.length === 0 ? (
+                  <div className="empty-chat">
+                    <p>开始与AI助手对话吧</p>
+                  </div>
+                ) : (
+                  messages.map((msg, index) => (
+                    <div 
+                      key={index} 
+                      className={`message ${msg.role === 'user' ? 'user-message' : 'assistant-message'}`}
+                    >
+                      <div className="message-role">{msg.role === 'user' ? '用户' : 'AI助手'}</div>
+                      <div className="message-content">{msg.content}</div>
+                    </div>
+                  ))
+                )}
+                {isLoading && (
+                  <div className="message assistant-message loading">
+                    <div className="message-role">AI助手</div>
+                    <div className="message-content">
+                      <div className="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
         </div>
         
-        <div className="guide-section">
-          <h3>客户端配置</h3>
-          <p>
-            您需要修改您的OpenAI客户端应用程序的配置，使其将API请求发送到此中间人服务器，而不是直接发送到OpenAI官方API。
-          </p>
-          
-          <h4>NodeJS示例</h4>
-          <pre className="code-block">
-{`// 使用OpenAI官方SDK
-const { Configuration, OpenAIApi } = require("openai");
-
-const configuration = new Configuration({
-  apiKey: "your-api-key",
-  // 修改基础URL指向中间人服务器
-  basePath: "http://localhost:8080/v1",
-});
-
-const openai = new OpenAIApi(configuration);
-
-async function main() {
-  const response = await openai.createChatCompletion({
-    model: "gpt-3.5-turbo",
-    messages: [
-      { role: "system", content: "你是一个有帮助的助手。" },
-      { role: "user", content: "你好，请问你是谁？" }
-    ],
-  });
-  
-  console.log(response.data);
-}
-
-main();`}
-          </pre>
-          
-          <h4>Python示例</h4>
-          <pre className="code-block">
-{`# 使用OpenAI官方SDK
-import openai
-
-# 配置API密钥
-openai.api_key = "your-api-key"
-# 修改基础URL指向中间人服务器
-openai.api_base = "http://localhost:8080/v1"
-
-# 发送请求
-response = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo",
-    messages=[
-        {"role": "system", "content": "你是一个有帮助的助手。"},
-        {"role": "user", "content": "你好，请问你是谁？"}
-    ]
-)
-
-print(response)`}
-          </pre>
-        </div>
-        
-        <div className="guide-section">
-          <h3>查看和分析请求</h3>
-          <p>
-            所有经过中间人服务器的API请求都会被记录。您可以在"请求列表"页面中查看所有请求，并点击"查看详情"按钮查看请求的详细信息。
-          </p>
-          <p>
-            请求详情页面显示了请求的完整信息，包括请求头、请求参数和请求体。
-          </p>
-          <p>
-            您可以使用这些信息来了解API的使用情况、调试应用程序问题，或者学习OpenAI API的用法。
-          </p>
-        </div>
-        
-        <div className="guide-section">
-          <h3>数据管理</h3>
-          <p>
-            在"系统设置"页面的"存储管理"部分，您可以导出所有请求数据或者清空请求记录。
-          </p>
-          <p>
-            导出的数据格式为JSONL（每行一个JSON对象），您可以使用文本编辑器或者数据分析工具打开和处理。
-          </p>
+              <div className="chat-input-container">
+                <textarea 
+                  className="chat-input"
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="输入消息..."
+                  disabled={isLoading}
+                  rows={2}
+                />
+                <button 
+                  className="send-button"
+                  onClick={sendMessage}
+                  disabled={isLoading || !inputMessage.trim()}
+                >
+                  {isLoading ? '发送中...' : '发送'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </Layout>

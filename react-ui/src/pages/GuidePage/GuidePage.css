@@ -1,20 +1,374 @@
-/* 工具页/指南页样式 */
-.guide-section {
+/* 指南页面样式 - 简化版 */
+.simple-guide-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.guide-card {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+}
+
+.guide-card h2 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+}
+
+.guide-description {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #555;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.config-section {
   margin-bottom: 30px;
 }
 
-.guide-section h2 {
+.config-section h3 {
+  margin-top: 0;
   margin-bottom: 15px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #444;
+  display: flex;
+  align-items: center;
 }
 
-.guide-section p {
-  margin-bottom: 10px;
+.config-item {
+  margin-bottom: 20px;
+}
+
+.input-with-copy {
+  display: flex;
+  position: relative;
+}
+
+.config-input {
+  flex: 1;
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #333;
+  background: #f9f9f9;
+  font-family: monospace;
+}
+
+.config-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.copy-button {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  padding: 0 15px;
+  border-radius: 0 6px 6px 0;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.copy-button:hover {
+  background-color: #1d4ed8;
+}
+
+.button-secondary {
+  background-color: #f3f4f6;
+  color: #444;
+  border: 1px solid #ddd;
+  padding: 0 15px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-right: 5px;
+}
+
+.button-secondary:hover {
+  background-color: #e5e7eb;
+}
+
+.config-hint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #666;
+}
+
+.example-section h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #444;
+}
+
+.code-container {
+  position: relative;
+  margin: 20px 0;
 }
 
 .code-block {
-  background-color: #f8f9fa;
-  padding: 15px;
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  padding: 20px;
+  border-radius: 8px;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre;
+  margin-bottom: 0;
+}
+
+.copy-button-code {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #d4d4d4;
+  border: none;
   border-radius: 4px;
-  font-family: monospace;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copy-button-code:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 聊天测试区域样式 */
+.chat-test-section {
+  margin-top: 40px;
+  border-top: 1px solid #eee;
+  padding-top: 30px;
+}
+
+.chat-test-section h3 {
+  margin-top: 0;
   margin-bottom: 15px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #444;
+}
+
+.chat-description {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.chat-container {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
+}
+
+.messages-container {
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+  background-color: #f9fafb;
+  min-height: 300px;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.empty-chat {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #9ca3af;
+  text-align: center;
+  font-size: 14px;
+  flex: 1;
+}
+
+.message {
+  margin-bottom: 15px;
+  max-width: 80%;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.user-message {
+  align-self: flex-end;
+  background-color: #2563eb;
+  color: white;
+  border-radius: 18px 18px 4px 18px;
+  padding: 12px 15px;
+}
+
+.assistant-message {
+  align-self: flex-start;
+  background-color: white;
+  color: #333;
+  border-radius: 18px 18px 18px 4px;
+  padding: 12px 15px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.message-role {
+  font-size: 12px;
+  margin-bottom: 5px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.message-content {
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.chat-input-container {
+  display: flex;
+  padding: 15px;
+  background-color: white;
+  border-top: 1px solid #e5e7eb;
+}
+
+.chat-input {
+  flex: 1;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 10px 15px;
+  font-size: 14px;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+
+.chat-input:focus {
+  border-color: #2563eb;
+}
+
+.send-button {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0 20px;
+  margin-left: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.send-button:hover:not(:disabled) {
+  background-color: #1d4ed8;
+}
+
+.send-button:disabled {
+  background-color: #93c5fd;
+  cursor: not-allowed;
+}
+
+/* 加载动画 */
+.typing-indicator {
+  display: flex;
+  padding: 5px;
+}
+
+.typing-indicator span {
+  height: 8px;
+  width: 8px;
+  background-color: #93c5fd;
+  border-radius: 50%;
+  display: inline-block;
+  margin: 0 2px;
+  opacity: 0.6;
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0.6); }
+  40% { transform: scale(1); }
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .simple-guide-container {
+    padding: 15px;
+  }
+  
+  .guide-card {
+    padding: 20px;
+  }
+  
+  .input-with-copy {
+    flex-direction: column;
+  }
+  
+  .config-input {
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+  
+  .copy-button {
+    border-radius: 6px;
+    width: 100%;
+    padding: 10px 0;
+  }
+  
+  .button-secondary {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 10px;
+    padding: 10px 0;
+  }
+  
+  .message {
+    max-width: 90%;
+  }
+  
+  .chat-input-container {
+    flex-direction: column;
+  }
+  
+  .chat-input {
+    margin-bottom: 10px;
+  }
+  
+  .send-button {
+    margin-left: 0;
+    width: 100%;
+    padding: 10px 0;
+  }
 } 
