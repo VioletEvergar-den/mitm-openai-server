@@ -45,12 +45,12 @@ const RequestDetailPage: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!id) return;
-      
-      setLoading(true);
+    if (!id) return;
+    
+    setLoading(true);
       setError(null);
       
-      try {
+    try {
         // 获取当前请求详情
         const requestData: any = await apiService.getRequestById(id);
         console.log('请求详情数据:', requestData); // 添加调试输出
@@ -79,7 +79,7 @@ const RequestDetailPage: React.FC = () => {
                 if (possibleHost.includes('.') || possibleHost.includes(':')) {
                   extractedHost = possibleHost;
                 }
-              }
+      }
             } catch (e) {
               console.error('从URL提取主机名失败:', e);
             }
@@ -157,10 +157,10 @@ const RequestDetailPage: React.FC = () => {
       } catch (err) {
         console.error('Failed to fetch request data:', err);
         setError('无法加载请求详情');
-      } finally {
-        setLoading(false);
-      }
-    };
+    } finally {
+      setLoading(false);
+    }
+  };
 
     fetchData();
   }, [id]);
@@ -170,9 +170,9 @@ const RequestDetailPage: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // 避免在输入框中触发
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-      
+      return;
+    }
+    
       // 左方向键导航到上一个请求
       if (e.key === 'ArrowLeft' && prevRequestId) {
         navigateToPrevious();
@@ -325,7 +325,7 @@ const RequestDetailPage: React.FC = () => {
               <Tooltip title="删除此请求">
                 <Button 
                   icon={<DeleteOutlined />} 
-                  onClick={handleDelete}
+              onClick={handleDelete}
                   danger
                   type="text"
                 />
@@ -359,7 +359,7 @@ const RequestDetailPage: React.FC = () => {
                 size="small" 
                 title="请求头"
                 extra={renderCardExtra('请求头', request.requestHeaders)}
-              >
+            >
                 {request.requestHeaders && Object.keys(request.requestHeaders).length > 0 ? (
                   <div className="json-viewer">
                     <JSONPretty 
@@ -367,7 +367,7 @@ const RequestDetailPage: React.FC = () => {
                       data={request.requestHeaders}
                       theme={jsonPrettyTheme}
                     />
-                  </div>
+          </div>
                 ) : (
                   <Text type="secondary">无请求头</Text>
                 )}
@@ -386,7 +386,7 @@ const RequestDetailPage: React.FC = () => {
                       data={request.queryParams}
                       theme={jsonPrettyTheme}
                     />
-                  </div>
+        </div>
                 </Card>
               )}
               
@@ -403,7 +403,7 @@ const RequestDetailPage: React.FC = () => {
                       data={request.requestBody}
                       theme={jsonPrettyTheme}
                     />
-                  </div>
+        </div>
                 </Card>
               )}
             </TabPane>
@@ -421,7 +421,7 @@ const RequestDetailPage: React.FC = () => {
                       data={request.responseHeaders}
                       theme={jsonPrettyTheme}
                     />
-                  </div>
+        </div>
                 ) : (
                   <Text type="secondary">无响应头</Text>
                 )}
@@ -440,7 +440,7 @@ const RequestDetailPage: React.FC = () => {
                       data={request.responseBody}
                       theme={jsonPrettyTheme}
                     />
-                  </div>
+        </div>
                 </Card>
               )}
             </TabPane>

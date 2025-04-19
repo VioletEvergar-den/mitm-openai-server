@@ -237,7 +237,7 @@
   display: flex;
   align-items: center;
   min-height: 40px;
-}
+  }
 
 .ant-card-small .ant-card-head-title {
   padding: 8px 0;
