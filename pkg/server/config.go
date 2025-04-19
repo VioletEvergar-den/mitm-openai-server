@@ -17,6 +17,9 @@ type UserConfig struct {
 	TargetPassword string `json:"target_password,omitempty"`
 	TargetToken    string `json:"target_token,omitempty"`
 
+	// 数据存储设置
+	StoragePath string `json:"storage_path,omitempty"`
+
 	// 其他用户设置可以在此添加
 }
 
@@ -86,5 +89,11 @@ func (cm *ConfigManager) ApplyConfig(config UserConfig, server *Server) {
 	}
 	if config.TargetToken != "" {
 		server.config.TargetToken = config.TargetToken
+	}
+
+	// 应用存储路径设置
+	if config.StoragePath != "" {
+		// 存储路径保存在配置中，实际应用在启动时处理
+		server.storagePath = config.StoragePath
 	}
 }
