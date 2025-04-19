@@ -15,4 +15,20 @@
 /* 标签标签容器 */
 .ant-tabs-nav {
   margin-bottom: 16px !important;
+}
+
+/* 标签页内容容器 */
+.ant-tabs-content {
+  width: 100%;
+  overflow: visible;
+}
+
+.ant-tabs-tabpane {
+  overflow: visible;
+}
+
+/* 确保内容能够完整显示 */
+.ant-tabs-tabpane-active {
+  display: block;
+  width: 100%;
 } 
