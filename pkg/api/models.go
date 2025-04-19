@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/llm-sec/mitm-openai-server/pkg/openai"
 	"github.com/llm-sec/mitm-openai-server/pkg/storage"
 )
 
@@ -36,14 +37,9 @@ type ServerConfig struct {
 	TargetToken    string
 }
 
-// OpenAIServiceInterface 定义与OpenAI服务交互的接口
-type OpenAIServiceInterface interface {
-	// ServeOpenAISpec 提供OpenAI API规范
-	ServeOpenAISpec(c *gin.Context)
-
-	// HandleRequest 处理OpenAI请求
-	HandleRequest(method, path string, headers, queryParams map[string]string, body []byte) (int, map[string]string, interface{}, error)
-}
+// OpenAIServiceInterface 使用 openai.Service 接口
+// 这样可以在 api 包中使用 openai 包的接口定义
+type OpenAIServiceInterface = openai.Service
 
 // UIServerInterface 定义与UI服务交互的接口
 type UIServerInterface interface {

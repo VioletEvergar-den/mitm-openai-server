@@ -29,7 +29,7 @@ type Server struct {
 	openaiService openai.Service        // OpenAI服务接口
 	configManager *ConfigManager        // 配置管理器
 	uiServer      api.UIServerInterface // UI服务器接口
-	openaiHandler interface{}           // OpenAI API处理器，可以是api.OpenAIHandler或openai.Handler
+	openaiHandler interface{}           // OpenAI API处理器，使用openai.Handler
 	storagePath   string                // 用户配置的数据存储路径
 }
 
