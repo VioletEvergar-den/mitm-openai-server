@@ -1,11 +1,18 @@
 import React from 'react';
+import { Layout as AntLayout, theme } from 'antd';
 import Navbar from '../Navbar/Navbar';
 import './Layout.css';
+
+const { Header, Content, Footer } = AntLayout;
 
 const Layout: React.FC<{
   children: React.ReactNode;
   title?: string;
 }> = ({ children, title }) => {
+  const {
+    token: { colorBgContainer, borderRadiusLG },
+  } = theme.useToken();
+
   // 设置页面标题
   React.useEffect(() => {
     if (title) {
@@ -16,12 +23,26 @@ const Layout: React.FC<{
   }, [title]);
 
   return (
-    <div className="layout">
-      <Navbar />
-      <div className="layout-content container">
-        {children}
-      </div>
-    </div>
+    <AntLayout className="layout" style={{ minHeight: '100vh' }}>
+      <Header style={{ padding: 0, backgroundColor: '#001529' }}>
+        <Navbar />
+      </Header>
+      <Content style={{ padding: '0 50px', marginTop: 16 }}>
+        <div 
+          style={{ 
+            padding: 24, 
+            background: colorBgContainer, 
+            borderRadius: borderRadiusLG,
+            minHeight: 280
+          }}
+        >
+          {children}
+        </div>
+      </Content>
+      <Footer style={{ textAlign: 'center' }}>
+        中间人OpenAI API服务器 ©{new Date().getFullYear()} Created by llm-sec Team
+      </Footer>
+    </AntLayout>
   );
 };
 

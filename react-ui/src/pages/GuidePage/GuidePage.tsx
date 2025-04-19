@@ -218,8 +218,8 @@ const GuidePage: React.FC = () => {
                     </div>
                   </div>
                 )}
-              </div>
-              
+        </div>
+        
               <div className="chat-input-container">
                 <textarea 
                   className="chat-input"

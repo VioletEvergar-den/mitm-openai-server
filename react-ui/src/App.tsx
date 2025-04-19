@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ConfigProvider, theme } from 'antd';
 import LoginPage from './pages/LoginPage';
 import RequestsPage from './pages/RequestsPage';
 import RequestDetailPage from './pages/RequestDetailPage';
@@ -20,41 +21,52 @@ const ProtectedRoute: React.FC<{children: React.ReactNode}> = ({ children }) => 
   return <>{children}</>;
 };
 
+// 定义主题配置
+const themeConfig = {
+  token: {
+    colorPrimary: '#1890ff',
+    borderRadius: 4,
+  },
+  algorithm: theme.defaultAlgorithm,
+};
+
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            
-            <Route path="/" element={
-              <ProtectedRoute>
-                <RequestsPage />
-              </ProtectedRoute>
-            } />
+    <ConfigProvider theme={themeConfig}>
+      <AuthProvider>
+        <NotificationProvider>
+          <Router>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <RequestsPage />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/requests/:id" element={
-              <ProtectedRoute>
-                <RequestDetailPage />
-              </ProtectedRoute>
-            } />
+              <Route path="/requests/:id" element={
+                <ProtectedRoute>
+                  <RequestDetailPage />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/settings" element={
-              <ProtectedRoute>
-                <SettingsPage />
-              </ProtectedRoute>
-            } />
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <SettingsPage />
+                </ProtectedRoute>
+              } />
 
-            <Route path="/guide" element={
-              <ProtectedRoute>
-                <GuidePage />
-              </ProtectedRoute>
-            } />
-          </Routes>
-        </Router>
-      </NotificationProvider>
-    </AuthProvider>
+              <Route path="/guide" element={
+                <ProtectedRoute>
+                  <GuidePage />
+                </ProtectedRoute>
+              } />
+            </Routes>
+          </Router>
+        </NotificationProvider>
+      </AuthProvider>
+    </ConfigProvider>
   );
 };
 
