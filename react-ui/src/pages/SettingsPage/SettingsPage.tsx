@@ -122,6 +122,26 @@ const SettingsPage: React.FC = () => {
     apiService.exportRequests();
   };
 
+  // 处理存储路径设置
+  const handleSavePath = async () => {
+    setSaving(true);
+    
+    try {
+      const success = await apiService.saveProxyConfig(proxyConfig);
+      
+      if (success) {
+        addNotification('存储路径设置已保存', 'success');
+      } else {
+        addNotification('保存存储路径设置失败', 'danger');
+      }
+    } catch (error) {
+      console.error('保存存储路径设置失败:', error);
+      addNotification('保存存储路径设置失败', 'danger');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Layout title="系统设置">
       <div className="settings-container">
@@ -292,6 +312,31 @@ const SettingsPage: React.FC = () => {
             </div>
           ) : storageStats ? (
             <div className="storage-content">
+              <div className="form-group">
+                <label htmlFor="storagePath">数据存储路径</label>
+                <div className="input-container">
+                  <input 
+                    type="text" 
+                    id="storagePath" 
+                    name="storagePath" 
+                    className="form-control"
+                    value={proxyConfig.storagePath || ''}
+                    onChange={handleChange}
+                    placeholder="请输入本地存储路径，留空使用默认路径"
+                  />
+                  <span className="input-icon">📁</span>
+                </div>
+                <div className="form-hint">设置后需要重启服务器才能生效。留空则使用当前目录下的data文件夹</div>
+                <button 
+                  onClick={() => handleSavePath()}
+                  className="btn-primary"
+                  disabled={saving}
+                  style={{marginTop: '10px'}}
+                >
+                  保存路径设置
+                </button>
+              </div>
+              
               <div className="stats-container">
                 <div className="stat-card">
                   <div className="stat-icon">📊</div>

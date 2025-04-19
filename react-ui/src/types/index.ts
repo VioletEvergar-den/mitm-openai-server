@@ -26,6 +26,7 @@ export interface ProxyConfig {
   username?: string;
   password?: string;
   token?: string;
+  storagePath?: string;
 }
 
 // 认证状态
