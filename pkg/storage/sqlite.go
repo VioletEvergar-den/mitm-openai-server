@@ -23,11 +23,12 @@ type SQLiteStorage struct {
 func NewSQLiteStorage(dataFolder string) (*SQLiteStorage, error) {
 	// 如果未提供路径，使用默认位置
 	if dataFolder == "" {
-		homeDir, err := os.UserHomeDir()
+		// 获取当前目录作为默认存储位置
+		currentDir, err := os.Getwd()
 		if err != nil {
-			return nil, fmt.Errorf("获取用户主目录失败: %w", err)
+			return nil, fmt.Errorf("获取当前工作目录失败: %w", err)
 		}
-		dataFolder = filepath.Join(homeDir, ".fake-openapi-server", "sqlite")
+		dataFolder = filepath.Join(currentDir, "data")
 	}
 
 	// 确保数据文件夹存在
