@@ -1,0 +1,49 @@
+/* JSON查看器样式增强 */
+.json-viewer {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+/* 针对react-json-pretty组件的自定义样式 */
+.json-viewer pre {
+  margin: 0 !important;
+  border-radius: 6px;
+}
+
+.json-viewer a {
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+/* 复制按钮样式 */
+.ant-card-extra .ant-btn-text {
+  opacity: 0.6;
+  transition: all 0.3s;
+  border-radius: 4px;
+  padding: 0 8px;
+}
+
+.ant-card-extra .ant-btn-text:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #1890ff;
+}
+
+.ant-card-small .ant-card-head {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+}
+
+.ant-card-small .ant-card-head-title {
+  padding: 8px 0;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.ant-card-small .ant-card-extra {
+  padding: 8px 0;
+} 

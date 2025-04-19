@@ -1,0 +1,63 @@
+import React from 'react';
+import { Card, Button, Tooltip, Typography } from 'antd';
+import { CopyOutlined } from '@ant-design/icons';
+import JSONPretty from 'react-json-pretty';
+import 'react-json-pretty/themes/monikai.css';
+import './JsonCardView.css';
+
+const { Text } = Typography;
+
+interface JsonCardViewProps {
+  title: string;
+  data: any;
+  copyToClipboard: (text: any) => void;
+  style?: React.CSSProperties;
+  jsonPrettyTheme: any;
+}
+
+const JsonCardView: React.FC<JsonCardViewProps> = ({
+  title,
+  data,
+  copyToClipboard,
+  style,
+  jsonPrettyTheme
+}) => {
+  const renderCardExtra = () => (
+    <Tooltip title={`复制${title}内容到剪贴板`} placement="left">
+      <Button 
+        type="text" 
+        icon={<CopyOutlined />} 
+        onClick={() => copyToClipboard(data)}
+        size="small"
+        title={`复制${title}`}
+      />
+    </Tooltip>
+  );
+
+  const hasData = data && (
+    typeof data === 'object' ? Object.keys(data).length > 0 : true
+  );
+
+  return (
+    <Card 
+      size="small" 
+      title={title}
+      style={style}
+      extra={renderCardExtra()}
+    >
+      {hasData ? (
+        <div className="json-viewer">
+          <JSONPretty 
+            id={`json-pretty-${title.replace(/\s+/g, '-').toLowerCase()}`}
+            data={data}
+            theme={jsonPrettyTheme}
+          />
+        </div>
+      ) : (
+        <Text type="secondary">无数据</Text>
+      )}
+    </Card>
+  );
+};
+
+export default JsonCardView; 
