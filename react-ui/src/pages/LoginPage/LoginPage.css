@@ -1,0 +1,404 @@
+/* 登录页样式 */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  height: 100vh;
+  background: linear-gradient(135deg, #e6f0ff, #d8e9ff, #c3dafe);
+  position: relative;
+  overflow: hidden;
+  animation: gradientAnimation 15s ease infinite;
+}
+
+@keyframes gradientAnimation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* 粒子背景 */
+.login-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: radial-gradient(circle, rgba(76, 154, 255, 0.1) 1px, transparent 1px),
+                    radial-gradient(circle, rgba(120, 180, 255, 0.07) 2px, transparent 2px);
+  background-size: 50px 50px, 100px 100px;
+  animation: particleAnimation 20s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes particleAnimation {
+  0% {
+    background-position: 0 0, 0 0;
+  }
+  100% {
+    background-position: 50px 50px, 100px 100px;
+  }
+}
+
+/* 额外的浮动粒子 */
+.login-container::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.2) 1px, transparent 2px),
+    radial-gradient(circle at 30% 70%, rgba(255, 255, 255, 0.15) 2px, transparent 3px),
+    radial-gradient(circle at 60% 30%, rgba(255, 255, 255, 0.2) 1px, transparent 2px),
+    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.15) 2px, transparent 3px);
+  animation: floatingParticles 30s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes floatingParticles {
+  0% {
+    transform: translateY(0) translateX(0);
+  }
+  25% {
+    transform: translateY(-10px) translateX(5px);
+  }
+  50% {
+    transform: translateY(0) translateX(10px);
+  }
+  75% {
+    transform: translateY(10px) translateX(5px);
+  }
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+}
+
+/* Banner样式 */
+.login-banner {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  padding: 25px 40px;
+  border-radius: 16px;
+  margin-bottom: 35px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.05);
+  text-align: center;
+  color: #333;
+  max-width: 600px;
+  width: 90%;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.login-banner:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.login-banner::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 45%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.1) 55%,
+    transparent 100%
+  );
+  transform: rotate(45deg);
+  animation: shimmer 8s infinite;
+  z-index: 1;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-150%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(150%) rotate(45deg);
+  }
+}
+
+.banner-content {
+  position: relative;
+  z-index: 2;
+}
+
+.banner-content h1 {
+  margin: 0;
+  font-size: 2.7rem;
+  font-weight: 800;
+  background: linear-gradient(90deg, #4a6fa5, #5d8bd1, #4a6fa5);
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textGradient 5s ease infinite;
+  letter-spacing: -0.5px;
+  margin-bottom: 15px;
+}
+
+@keyframes textGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.banner-content p {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #5e6c84;
+  font-weight: 500;
+}
+
+.login-card {
+  width: 90%;
+  max-width: 400px;
+  padding: 35px;
+  background-color: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08), 0 2px 10px rgba(0, 0, 0, 0.05);
+  position: relative;
+  z-index: 1;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.login-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.1), 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.login-title {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #4a6fa5;
+  font-weight: 700;
+  font-size: 1.8rem;
+}
+
+/* 表单样式 */
+.form-group {
+  margin-bottom: 22px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: #5e6c84;
+  font-size: 0.95rem;
+}
+
+.form-control {
+  width: 100%;
+  padding: 14px 15px;
+  border: 1px solid rgba(222, 235, 255, 0.9);
+  border-radius: 8px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  background-color: #f8faff;
+  color: #344563;
+}
+
+.form-control:focus {
+  border-color: #4c9aff;
+  box-shadow: 0 0 0 3px rgba(76, 154, 255, 0.25);
+  outline: none;
+  background-color: #fff;
+}
+
+/* 密码输入框容器 */
+.password-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 15px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: #6b778c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  margin: 0;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.password-toggle-btn:hover {
+  color: #4a6fa5;
+  transform: scale(1.1);
+}
+
+/* 记住我选项 */
+.remember-me {
+  display: flex;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding-left: 30px;
+  cursor: pointer;
+  font-size: 15px;
+  user-select: none;
+  color: #5e6c84;
+  font-weight: 500;
+}
+
+.checkbox-container input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkmark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 20px;
+  width: 20px;
+  background-color: #f4f5f7;
+  border-radius: 4px;
+  transition: all 0.3s;
+  border: 1px solid #dfe1e6;
+}
+
+.checkbox-container:hover input ~ .checkmark {
+  background-color: #ebecf0;
+}
+
+.checkbox-container input:checked ~ .checkmark {
+  background-color: #4c9aff;
+  border-color: #4c9aff;
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+.checkbox-container input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.checkbox-container .checkmark:after {
+  left: 7px;
+  top: 3px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* 按钮样式 */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #5c9eff, #0065ff);
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transform: translateX(-100%);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #4c90f5, #0052cc);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0, 101, 255, 0.2);
+}
+
+.btn-primary:hover::after {
+  transform: translateX(100%);
+  transition: transform 0.8s;
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 10px rgba(0, 101, 255, 0.3);
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* 警告消息 */
+.alert {
+  padding: 14px 16px;
+  margin-bottom: 25px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alert-danger {
+  background-color: #ffebe6;
+  border-left: 4px solid #ff5630;
+  color: #de350b;
+} 

@@ -1,0 +1,27 @@
+/* 设置页样式 */
+.settings-section {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.settings-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.settings-form {
+  margin-top: 15px;
+}
+
+.settings-info {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 10px;
+} 

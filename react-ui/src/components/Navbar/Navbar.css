@@ -1,0 +1,60 @@
+/* 导航栏样式 */
+.navbar {
+  background-color: #343a40;
+  color: white;
+  padding: 15px 0;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.navbar-brand {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: white;
+  text-decoration: none;
+}
+
+.navbar-menu {
+  display: flex;
+  list-style: none;
+}
+
+.navbar-item {
+  margin-left: 20px;
+}
+
+.navbar-link {
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+
+.navbar-link:hover, 
+.navbar-link.active {
+  color: white;
+}
+
+/* 移动设备响应式 */
+@media (max-width: 768px) {
+  .navbar-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .navbar-menu {
+    margin-top: 15px;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .navbar-item {
+    margin-left: 0;
+    margin-top: 10px;
+  }
+} 
