@@ -1,5 +1,9 @@
 package openai
 
+import (
+	"github.com/llm-sec/mitm-openai-server/pkg/storage"
+)
+
 // NewService 根据配置创建适当的OpenAI服务
 // 根据ProxyMode配置，返回代理服务或模拟服务
 func NewService(config Config) Service {
@@ -23,4 +27,27 @@ func GetServiceByName(name string, config Config) Service {
 		// 默认返回模拟服务
 		return MockServiceCreator(config)
 	}
+}
+
+// 全局处理器实例，用于直接保存请求
+var globalHandler *Handler
+
+// InitGlobalHandler 初始化全局处理器
+// 这个函数应该在服务启动时被调用一次
+func InitGlobalHandler(storage storage.Storage, service Service) {
+	globalHandler = NewHandler(storage, service)
+}
+
+// SaveRequest 全局函数，用于保存请求记录
+// 这个函数可以从包外部调用，而不需要直接访问处理器实例
+// 参数:
+//   - request: 要保存的请求记录
+//
+// 返回:
+//   - error: 如果保存失败，返回错误信息
+func SaveRequest(request *storage.Request) error {
+	if globalHandler == nil {
+		return nil // 如果全局处理器未初始化，静默忽略
+	}
+	return globalHandler.SaveRequest(request)
 }
