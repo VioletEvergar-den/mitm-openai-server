@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../../components/Layout/Layout';
 import './GuidePage.css';
 
@@ -9,12 +9,30 @@ const GuidePage: React.FC = () => {
     'http://localhost:8080' : window.location.origin;
   const apiUrl = '/v1';
   const fullApiUrl = backendUrl + apiUrl; // 完整的API地址，包括/v1路径
-  const token = 'Bearer mt-mitm-server-token'; // 实际应该从后端API获取
+  const [token, setToken] = useState('Bearer mt-mitm-server-token'); // 默认值
 
   // 对话状态
   const [messages, setMessages] = useState<Array<{role: string, content: string}>>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // 获取有效token
+  useEffect(() => {
+    const fetchToken = async () => {
+      try {
+        // 从后端获取真实token
+        const response = await fetch(`${backendUrl}/ui/api/token`);
+        const data = await response.json();
+        if (data.code === 0 && data.data && data.data.token) {
+          setToken(`Bearer ${data.data.token}`);
+        }
+      } catch (error) {
+        console.error('获取token失败:', error);
+      }
+    };
+
+    fetchToken();
+  }, [backendUrl]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -39,15 +57,13 @@ const GuidePage: React.FC = () => {
         temperature: 0.7
       };
       
-      // 发送请求到MITM OpenAI Server
-      // 这里使用MITM UI API的chat接口，而不是直接请求OpenAI API
-      const response = await fetch(`/ui/api/chat`, {
+      // 直接使用OpenAI API路径
+      const response = await fetch(`${backendUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': token
         },
-        credentials: 'include',
         body: JSON.stringify(requestData)
       });
       
@@ -63,7 +79,7 @@ const GuidePage: React.FC = () => {
         setMessages([...updatedMessages, assistantMessage]);
       }
     } catch (error) {
-      console.error('请求MITM OpenAI API失败:', error);
+      console.error('请求OpenAI API失败:', error);
       // 添加错误消息
       setMessages([
         ...updatedMessages, 
@@ -202,8 +218,8 @@ const GuidePage: React.FC = () => {
                     </div>
                   </div>
                 )}
-        </div>
-        
+              </div>
+              
               <div className="chat-input-container">
                 <textarea 
                   className="chat-input"
