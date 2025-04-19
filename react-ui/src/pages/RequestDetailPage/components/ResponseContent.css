@@ -1,5 +1,10 @@
 .response-content {
   margin-bottom: 20px;
+  width: 100%;
+}
+
+.response-section {
+  margin-bottom: 16px;
 }
 
 .response-header {
@@ -7,4 +12,11 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 15px;
+}
+
+/* 确保响应内容不会溢出 */
+.response-section .json-viewer {
+  width: 100%;
+  overflow-x: auto;
+  max-width: 100%;
 } 

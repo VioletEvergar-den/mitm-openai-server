@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import JsonCardView from './JsonCardView';
+import { Tag } from 'antd';
 import './ResponseContent.css';
 
 interface ResponseContentProps {
@@ -15,23 +16,60 @@ const ResponseContent: React.FC<ResponseContentProps> = ({
   copyToClipboard,
   jsonPrettyTheme
 }) => {
+  // 确保响应头正确显示
+  const formattedHeaders = useMemo(() => {
+    if (!responseHeaders) return {};
+    
+    // 如果是字符串，尝试解析为JSON
+    if (typeof responseHeaders === 'string') {
+      try {
+        return JSON.parse(responseHeaders);
+      } catch {
+        return { raw: responseHeaders };
+      }
+    }
+    
+    return responseHeaders;
+  }, [responseHeaders]);
+
+  // 确保响应体正确显示
+  const formattedBody = useMemo(() => {
+    if (!responseBody) return null;
+    
+    // 如果是字符串，尝试解析为JSON
+    if (typeof responseBody === 'string') {
+      try {
+        return JSON.parse(responseBody);
+      } catch {
+        // 如果不是有效的JSON，直接返回原始字符串
+        return responseBody;
+      }
+    }
+    
+    return responseBody;
+  }, [responseBody]);
+
   return (
     <div className="response-content">
-      <JsonCardView
-        title="响应头"
-        data={responseHeaders}
-        copyToClipboard={copyToClipboard}
-        jsonPrettyTheme={jsonPrettyTheme}
-      />
-      
-      {responseBody && (
+      <div className="response-section">
         <JsonCardView
-          title="响应体"
-          data={responseBody}
+          title="响应头"
+          data={formattedHeaders}
           copyToClipboard={copyToClipboard}
-          style={{ marginTop: 16 }}
           jsonPrettyTheme={jsonPrettyTheme}
         />
+      </div>
+      
+      {formattedBody && (
+        <div className="response-section">
+          <JsonCardView
+            title="响应体"
+            data={formattedBody}
+            copyToClipboard={copyToClipboard}
+            style={{ marginTop: 16 }}
+            jsonPrettyTheme={jsonPrettyTheme}
+          />
+        </div>
       )}
     </div>
   );
