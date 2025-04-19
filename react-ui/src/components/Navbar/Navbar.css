@@ -22,6 +22,9 @@
 .navbar-menu {
   display: flex;
   list-style: none;
+  align-items: center;
+  margin: 0;
+  padding: 0;
 }
 
 .navbar-item {
@@ -38,6 +41,26 @@
 .navbar-link:hover, 
 .navbar-link.active {
   color: white;
+}
+
+/* GitHub图标样式 */
+.github-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+
+.github-link:hover {
+  transform: scale(1.15);
+}
+
+.github-link svg {
+  fill: rgba(255, 255, 255, 0.85);
+}
+
+.github-link:hover svg {
+  fill: white;
 }
 
 /* 移动设备响应式 */
