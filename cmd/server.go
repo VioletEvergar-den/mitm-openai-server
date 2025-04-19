@@ -101,8 +101,32 @@ func runServer() {
 	// 设置Gin为发布模式，减少控制台输出
 	gin.SetMode(gin.ReleaseMode)
 
+	// 尝试从配置文件获取存储路径
+	homeDir, err := os.UserHomeDir()
+	var customStoragePath string
+	if err == nil {
+		configDir := filepath.Join(homeDir, ".mitm-openai-server")
+		configFile := filepath.Join(configDir, "storage_path.txt")
+		data, err := os.ReadFile(configFile)
+		if err == nil && len(data) > 0 {
+			customStoragePath = string(data)
+		}
+	}
+
+	// 确定最终使用的数据目录
+	finalDataDir := dataDir
+	if customStoragePath != "" {
+		finalDataDir = customStoragePath
+	} else {
+		// 如果没有自定义路径，使用当前目录下的data文件夹
+		currentDir, err := os.Getwd()
+		if err == nil {
+			finalDataDir = filepath.Join(currentDir, "data")
+		}
+	}
+
 	// 确保数据目录存在
-	absDataDir, err := filepath.Abs(dataDir)
+	absDataDir, err := filepath.Abs(finalDataDir)
 	if err != nil {
 		log.Fatalf("无法获取数据目录的绝对路径: %v", err)
 	}
