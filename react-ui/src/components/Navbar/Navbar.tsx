@@ -77,9 +77,9 @@ const Navbar: React.FC = () => {
       key: 'github',
       icon: <GithubOutlined />,
       label: <a 
-        href="https://github.com/llm-sec/mitm-openai-server" 
-        target="_blank" 
-        rel="noopener noreferrer"
+              href="https://github.com/llm-sec/mitm-openai-server" 
+              target="_blank" 
+              rel="noopener noreferrer" 
       >
         GitHub
       </a>,

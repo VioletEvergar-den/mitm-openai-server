@@ -26,7 +26,7 @@ const Layout: React.FC<{
   return (
     <AntLayout className="layout" style={{ minHeight: '100vh' }}>
       <Header style={{ padding: 0, backgroundColor: '#001529' }}>
-        <Navbar />
+      <Navbar />
       </Header>
       <Content style={{ padding: '0 50px', marginTop: 16 }}>
         <div 
@@ -37,8 +37,8 @@ const Layout: React.FC<{
             minHeight: 280
           }}
         >
-          {children}
-        </div>
+        {children}
+      </div>
       </Content>
       <Footer />
     </AntLayout>
