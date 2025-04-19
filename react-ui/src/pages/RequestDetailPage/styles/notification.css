@@ -1,0 +1,11 @@
+/* 复制成功消息提示样式 */
+.ant-message-success .anticon {
+  color: #52c41a;
+}
+
+/* 移动设备响应式样式 */
+@media (max-width: 768px) {
+  .ant-space {
+    flex-wrap: wrap;
+  }
+} 

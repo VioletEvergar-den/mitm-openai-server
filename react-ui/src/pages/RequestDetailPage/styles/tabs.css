@@ -1,0 +1,18 @@
+/* 优化标签页样式 */
+.request-detail-container .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+.request-detail-container .ant-tabs-tab {
+  transition: all 0.3s;
+  padding: 8px 16px;
+}
+
+.request-detail-container .ant-tabs-tab-active {
+  font-weight: 500;
+}
+
+/* 标签标签容器 */
+.ant-tabs-nav {
+  margin-bottom: 16px !important;
+} 
