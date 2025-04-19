@@ -29,7 +29,7 @@
 @media (min-width: 768px) {
   .login-container {
     flex-direction: row;
-  }
+}
 }
 
 .login-banner {
@@ -90,14 +90,14 @@
 @media (max-width: 767px) {
   .login-banner {
     padding: 30px;
-  }
+}
 }
 
 @media (max-width: 480px) {
   .login-banner {
     padding: 20px;
-  }
-  
+}
+
   .login-card {
     padding: 16px;
   }
@@ -117,7 +117,7 @@
 .login-card .ant-btn-primary {
   height: 45px;
   font-size: 16px;
-}
+  }
 
 /* 添加版权信息样式 */
 .ant-divider-inner-text {

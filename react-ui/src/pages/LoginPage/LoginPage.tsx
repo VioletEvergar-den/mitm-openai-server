@@ -109,8 +109,8 @@ const LoginPage: React.FC = () => {
   return (
     <Layout className="login-layout">
       <Content className="login-content">
-        <div className="login-container">
-          <div className="login-banner">
+    <div className="login-container">
+      <div className="login-banner">
             <Typography>
               <Title level={2}>MITM OpenAI Server</Title>
               <Paragraph>监控、拦截和分析AI API请求的工具</Paragraph>
@@ -158,8 +158,8 @@ const LoginPage: React.FC = () => {
                   prefix={<UserOutlined />} 
                   placeholder="请输入用户名" 
                   autoComplete="username"
-                  disabled={loading}
-                />
+                disabled={loading}
+              />
               </Form.Item>
               
               <Form.Item
@@ -171,7 +171,7 @@ const LoginPage: React.FC = () => {
                   prefix={<LockOutlined />}
                   placeholder="请输入密码"
                   autoComplete="current-password"
-                  disabled={loading}
+            disabled={loading}
                   iconRender={(visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
                 />
               </Form.Item>
@@ -193,7 +193,7 @@ const LoginPage: React.FC = () => {
               </Form.Item>
             </Form>
           </Card>
-        </div>
+      </div>
       </Content>
       <Footer />
     </Layout>
