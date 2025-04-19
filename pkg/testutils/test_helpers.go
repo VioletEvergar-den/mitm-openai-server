@@ -82,7 +82,7 @@ func CreateTestRequestWithParams(method string, path string, params gin.Params, 
 	return c, w
 }
 
-// 创建一个测试请求
+// CreateTestRequest 创建一个测试请求
 func CreateTestRequest(id string) *storage.Request {
 	if id == "" {
 		id = fmt.Sprintf("test-%d", time.Now().UnixNano())
@@ -91,12 +91,14 @@ func CreateTestRequest(id string) *storage.Request {
 		ID:        id,
 		Method:    "GET",
 		Path:      "/api/test",
-		Timestamp: time.Now().Format(time.RFC3339),
+		Timestamp: time.Now(),
 		Headers: map[string][]string{
-			"Content-Type": {"application/json"},
+			"User-Agent": {"Test Agent"},
+			"Accept":     {"application/json"},
 		},
 		Query: map[string][]string{
-			"param": {"value"},
+			"param1": {"value1"},
+			"param2": {"value2"},
 		},
 		Body:     `{"test": "data"}`,
 		ClientIP: "127.0.0.1",
@@ -105,92 +107,209 @@ func CreateTestRequest(id string) *storage.Request {
 			Headers: map[string][]string{
 				"Content-Type": {"application/json"},
 			},
-			Body: `{"result": "success"}`,
+			Body:    `{"result": "success"}`,
+			Latency: 123,
+		},
+		Metadata: map[string]interface{}{
+			"test_key": "test_value",
 		},
 	}
 }
 
-// testStorageImplementation 测试Storage接口的实现
-func testStorageImplementation(t *testing.T, storage storage.Storage) {
+// TestStorageImplementation 测试Storage接口的实现
+// 此方法可以被其他包引用，用于测试存储实现
+func TestStorageImplementation(t *testing.T, storage storage.Storage) {
 	// 清理存储
 	err := storage.DeleteAllRequests()
-	assert.NoError(t, err, "应能清理所有请求")
+	require.NoError(t, err)
 
 	// 保存请求
-	req1 := CreateTestRequest("test-id-1")
-	err = storage.SaveRequest(req1)
-	assert.NoError(t, err, "应能保存请求")
+	t.Run("SaveRequest", func(t *testing.T) {
+		req := CreateTestRequest("test1")
+		err := storage.SaveRequest(req)
+		assert.NoError(t, err)
+	})
 
 	// 获取请求
-	retrieved, err := storage.GetRequestByID("test-id-1")
-	assert.NoError(t, err, "应能获取请求")
-	assert.Equal(t, req1.ID, retrieved.ID, "ID应匹配")
-	assert.Equal(t, req1.Path, retrieved.Path, "Path应匹配")
+	t.Run("GetRequestByID", func(t *testing.T) {
+		// 先保存请求
+		req := CreateTestRequest("test2")
+		err := storage.SaveRequest(req)
+		require.NoError(t, err)
+
+		// 获取请求
+		retrievedReq, err := storage.GetRequestByID("test2")
+		assert.NoError(t, err)
+		assert.NotNil(t, retrievedReq)
+		assert.Equal(t, "test2", retrievedReq.ID)
+		assert.Equal(t, "GET", retrievedReq.Method)
+		assert.Equal(t, "/api/test", retrievedReq.Path)
+		assert.NotNil(t, retrievedReq.Response)
+		assert.Equal(t, 200, retrievedReq.Response.StatusCode)
+	})
+
+	// 获取不存在的请求
+	t.Run("GetNonExistentRequest", func(t *testing.T) {
+		_, err := storage.GetRequestByID("non-existent")
+		assert.Error(t, err)
+	})
 
 	// 获取所有请求
-	allReqs, err := storage.GetAllRequests(10, 0)
-	assert.NoError(t, err, "应能获取所有请求")
-	assert.Len(t, allReqs, 1, "应有1个请求")
+	t.Run("GetAllRequests", func(t *testing.T) {
+		// 先清理
+		err := storage.DeleteAllRequests()
+		require.NoError(t, err)
+
+		// 保存多个请求
+		for i := 1; i <= 5; i++ {
+			id := fmt.Sprintf("batch-test-%d", i)
+			req := CreateTestRequest(id)
+			err := storage.SaveRequest(req)
+			require.NoError(t, err)
+		}
+
+		// 获取所有请求
+		allRequests, err := storage.GetAllRequests(10, 0)
+		assert.NoError(t, err)
+		assert.Len(t, allRequests, 5)
+	})
+
+	// 分页测试
+	t.Run("Pagination", func(t *testing.T) {
+		// 先清理
+		err := storage.DeleteAllRequests()
+		require.NoError(t, err)
+
+		// 保存10个请求
+		for i := 1; i <= 10; i++ {
+			id := fmt.Sprintf("pagination-test-%d", i)
+			req := CreateTestRequest(id)
+			// 设置时间为递增，确保排序一致
+			req.Timestamp = time.Now().Add(time.Duration(i) * time.Minute)
+			err := storage.SaveRequest(req)
+			require.NoError(t, err)
+		}
+
+		// 第一页
+		page1, err := storage.GetAllRequests(3, 0)
+		assert.NoError(t, err)
+		assert.Len(t, page1, 3)
+
+		// 第二页
+		page2, err := storage.GetAllRequests(3, 3)
+		assert.NoError(t, err)
+		assert.Len(t, page2, 3)
+
+		// 确保页面没有重叠
+		ids1 := make(map[string]bool)
+		for _, req := range page1 {
+			ids1[req.ID] = true
+		}
+		for _, req := range page2 {
+			assert.False(t, ids1[req.ID], "请求ID不应该在两个页面中重复出现")
+		}
+	})
 
 	// 删除请求
-	err = storage.DeleteRequest("test-id-1")
-	assert.NoError(t, err, "应能删除请求")
+	t.Run("DeleteRequest", func(t *testing.T) {
+		// 先保存请求
+		req := CreateTestRequest("delete-test")
+		err := storage.SaveRequest(req)
+		require.NoError(t, err)
 
-	// 验证已删除
-	_, err = storage.GetRequestByID("test-id-1")
-	assert.Error(t, err, "获取已删除的请求应返回错误")
+		// 确认请求存在
+		_, err = storage.GetRequestByID("delete-test")
+		require.NoError(t, err)
 
-	// 批量保存
-	for i := 1; i <= 5; i++ {
-		req := CreateTestRequest(fmt.Sprintf("test-id-%d", i))
-		err = storage.SaveRequest(req)
-		assert.NoError(t, err, "应能保存请求")
-	}
+		// 删除请求
+		err = storage.DeleteRequest("delete-test")
+		assert.NoError(t, err)
 
-	// 获取所有请求（带分页）
-	pagedReqs, err := storage.GetAllRequests(3, 0)
-	assert.NoError(t, err, "应能获取分页请求")
-	assert.Len(t, pagedReqs, 3, "应有3个请求")
+		// 确认请求已删除
+		_, err = storage.GetRequestByID("delete-test")
+		assert.Error(t, err)
+	})
 
-	// 获取下一页
-	pagedReqs2, err := storage.GetAllRequests(3, 3)
-	assert.NoError(t, err, "应能获取第二页请求")
-	assert.Len(t, pagedReqs2, 2, "应有2个请求")
+	// 删除所有请求
+	t.Run("DeleteAllRequests", func(t *testing.T) {
+		// 先保存几个请求
+		for i := 1; i <= 3; i++ {
+			id := fmt.Sprintf("delete-all-test-%d", i)
+			req := CreateTestRequest(id)
+			err := storage.SaveRequest(req)
+			require.NoError(t, err)
+		}
 
-	// 清理所有请求
-	err = storage.DeleteAllRequests()
-	assert.NoError(t, err, "应能清理所有请求")
+		// 删除所有请求
+		err := storage.DeleteAllRequests()
+		assert.NoError(t, err)
 
-	// 验证全部已删除
-	emptyReqs, err := storage.GetAllRequests(10, 0)
-	assert.NoError(t, err, "应能获取空列表")
-	assert.Empty(t, emptyReqs, "请求列表应为空")
+		// 确认所有请求已删除
+		allRequests, err := storage.GetAllRequests(100, 0)
+		assert.NoError(t, err)
+		assert.Empty(t, allRequests)
+	})
+
+	// 导出请求
+	t.Run("ExportRequests", func(t *testing.T) {
+		// 先清理
+		err := storage.DeleteAllRequests()
+		require.NoError(t, err)
+
+		// 保存几个请求
+		for i := 1; i <= 3; i++ {
+			id := fmt.Sprintf("export-test-%d", i)
+			req := CreateTestRequest(id)
+			err := storage.SaveRequest(req)
+			require.NoError(t, err)
+		}
+
+		// 导出请求
+		exportPath, err := storage.ExportRequests()
+		assert.NoError(t, err)
+		assert.NotEmpty(t, exportPath)
+
+		// 确认导出文件存在
+		_, err = os.Stat(exportPath)
+		assert.NoError(t, err)
+	})
 }
 
-// testStorageReopen 测试重新打开存储后能否恢复数据
-func testStorageReopen(t *testing.T, createStorage func() (storage.Storage, error), cleanupFn func()) {
+// TestStorageReopen 测试重新打开存储后能否恢复数据
+func TestStorageReopen(t *testing.T, createStorage func() (storage.Storage, error), cleanupFn func()) {
 	var storage storage.Storage
 	var err error
 
-	// 创建存储并保存数据
-	storage, err = createStorage()
-	require.NoError(t, err, "应能创建存储")
+	// 清理上一个测试的数据
+	if cleanupFn != nil {
+		defer cleanupFn()
+	}
 
-	req1 := CreateTestRequest("reopen-id-1")
-	err = storage.SaveRequest(req1)
-	assert.NoError(t, err, "应能保存请求")
+	// 第一次打开存储
+	storage, err = createStorage()
+	require.NoError(t, err)
+
+	// 清理数据
+	err = storage.DeleteAllRequests()
+	require.NoError(t, err)
+
+	// 保存数据
+	req := CreateTestRequest("reopen-test")
+	err = storage.SaveRequest(req)
+	require.NoError(t, err)
 
 	// 关闭存储
 	err = storage.Close()
-	assert.NoError(t, err, "应能关闭存储")
+	require.NoError(t, err)
 
 	// 重新打开存储
 	storage, err = createStorage()
-	require.NoError(t, err, "应能重新打开存储")
-	defer cleanupFn()
+	require.NoError(t, err)
+	defer storage.Close()
 
-	// 验证数据是否保留
-	retrieved, err := storage.GetRequestByID("reopen-id-1")
-	assert.NoError(t, err, "应能获取之前保存的请求")
-	assert.Equal(t, req1.ID, retrieved.ID, "ID应匹配")
+	// 验证数据是否还存在
+	retrievedReq, err := storage.GetRequestByID("reopen-test")
+	assert.NoError(t, err)
+	assert.NotNil(t, retrievedReq)
+	assert.Equal(t, "reopen-test", retrievedReq.ID)
 }
