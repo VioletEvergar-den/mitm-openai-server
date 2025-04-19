@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import { Request } from '../../types';
@@ -17,6 +17,9 @@ const RequestDetailPage: React.FC = () => {
   const [request, setRequest] = useState<Request | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [prevId, setPrevId] = useState<string | null>(null);
+  const [nextId, setNextId] = useState<string | null>(null);
+  const [navigationLoading, setNavigationLoading] = useState(false);
 
   // 加载请求详情
   const loadRequestDetail = async () => {
@@ -28,6 +31,9 @@ const RequestDetailPage: React.FC = () => {
       
       if (data) {
         setRequest(data);
+        
+        // 加载前后导航
+        loadNavigationIds(id);
       } else {
         setNotFound(true);
       }
@@ -36,6 +42,24 @@ const RequestDetailPage: React.FC = () => {
       addNotification('加载请求详情失败', 'danger');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 加载前后请求ID
+  const loadNavigationIds = async (currentId: string) => {
+    setNavigationLoading(true);
+    try {
+      const [previousId, nextId] = await Promise.all([
+        apiService.getPreviousRequestId(currentId),
+        apiService.getNextRequestId(currentId)
+      ]);
+      
+      setPrevId(previousId);
+      setNextId(nextId);
+    } catch (error) {
+      console.error('加载导航数据失败:', error);
+    } finally {
+      setNavigationLoading(false);
     }
   };
 
@@ -60,10 +84,49 @@ const RequestDetailPage: React.FC = () => {
     }
   };
 
+  // 导航到前一个请求
+  const goToPrevious = useCallback(() => {
+    if (prevId && !navigationLoading) {
+      navigate(`/requests/${prevId}`);
+    }
+  }, [prevId, navigationLoading, navigate]);
+
+  // 导航到后一个请求
+  const goToNext = useCallback(() => {
+    if (nextId && !navigationLoading) {
+      navigate(`/requests/${nextId}`);
+    }
+  }, [nextId, navigationLoading, navigate]);
+
+  // 键盘导航事件处理
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return; // 如果焦点在输入框内，不处理键盘事件
+    }
+    
+    // 左方向键 - 上一条请求
+    if (e.key === 'ArrowLeft') {
+      goToPrevious();
+    }
+    
+    // 右方向键 - 下一条请求
+    if (e.key === 'ArrowRight') {
+      goToNext();
+    }
+  }, [goToPrevious, goToNext]);
+
   // 首次加载
   useEffect(() => {
     loadRequestDetail();
   }, [id]);
+
+  // 添加和移除键盘事件监听
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
 
   // 未找到请求的显示
   if (notFound) {
@@ -100,20 +163,39 @@ const RequestDetailPage: React.FC = () => {
       <div className="card">
         <div className="detail-header">
           <h2 className="detail-title">请求详情</h2>
-          <div>
-            <button
-              onClick={handleDelete}
-              className="btn btn-danger"
-            >
-              删除请求
-            </button>
-            <button
-              onClick={() => navigate('/')}
-              className="btn btn-primary"
-              style={{ marginLeft: '10px' }}
-            >
-              返回列表
-            </button>
+          <div className="detail-actions">
+            <div className="navigation-buttons">
+              <button
+                onClick={goToPrevious}
+                className="btn btn-secondary"
+                disabled={!prevId || navigationLoading}
+                title="上一条请求 (← 方向键)"
+              >
+                <span className="nav-icon">←</span> 上一条
+              </button>
+              <button
+                onClick={goToNext}
+                className="btn btn-secondary"
+                disabled={!nextId || navigationLoading}
+                title="下一条请求 (→ 方向键)"
+              >
+                下一条 <span className="nav-icon">→</span>
+              </button>
+            </div>
+            <div className="primary-actions">
+              <button
+                onClick={handleDelete}
+                className="btn btn-danger"
+              >
+                删除请求
+              </button>
+              <button
+                onClick={() => navigate('/')}
+                className="btn btn-primary"
+              >
+                返回列表
+              </button>
+            </div>
           </div>
         </div>
 
@@ -139,7 +221,7 @@ const RequestDetailPage: React.FC = () => {
               </tr>
               <tr>
                 <th>IP地址</th>
-                <td>{request?.ip}</td>
+                <td>{request?.ip || request?.ip_address || '未知'}</td>
               </tr>
             </tbody>
           </table>
@@ -149,7 +231,9 @@ const RequestDetailPage: React.FC = () => {
           <h3 className="detail-section-title">请求头</h3>
           <div className="json-viewer">
             <SyntaxHighlighter language="json" style={vscDarkPlus}>
-              {request?.headers ? JSON.stringify(request.headers, null, 2) : ''}
+              {request?.headers && Object.keys(request.headers).length > 0 
+                ? JSON.stringify(request.headers, null, 2) 
+                : '{}'}
             </SyntaxHighlighter>
           </div>
         </div>
@@ -158,7 +242,9 @@ const RequestDetailPage: React.FC = () => {
           <h3 className="detail-section-title">查询参数</h3>
           <div className="json-viewer">
             <SyntaxHighlighter language="json" style={vscDarkPlus}>
-              {request?.query ? JSON.stringify(request.query, null, 2) : ''}
+              {request?.query && Object.keys(request.query).length > 0 
+                ? JSON.stringify(request.query, null, 2) 
+                : '{}'}
             </SyntaxHighlighter>
           </div>
         </div>
@@ -167,7 +253,7 @@ const RequestDetailPage: React.FC = () => {
           <h3 className="detail-section-title">请求体</h3>
           <div className="json-viewer">
             <SyntaxHighlighter language="json" style={vscDarkPlus}>
-              {request?.body ? JSON.stringify(request.body, null, 2) : ''}
+              {request?.body ? JSON.stringify(request.body, null, 2) : '{}'}
             </SyntaxHighlighter>
           </div>
         </div>

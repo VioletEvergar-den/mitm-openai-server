@@ -5,6 +5,7 @@ export interface Request {
   method: string;
   path: string;
   ip: string;
+  ip_address?: string;
   headers: Record<string, string>;
   query: Record<string, string>;
   body?: any;
