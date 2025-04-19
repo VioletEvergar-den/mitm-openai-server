@@ -33,39 +33,39 @@ const themeConfig = {
 const App: React.FC = () => {
   return (
     <ConfigProvider theme={themeConfig}>
-      <AuthProvider>
-        <NotificationProvider>
-          <Router>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <RequestsPage />
-                </ProtectedRoute>
-              } />
+    <AuthProvider>
+      <NotificationProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            
+            <Route path="/" element={
+              <ProtectedRoute>
+                <RequestsPage />
+              </ProtectedRoute>
+            } />
 
-              <Route path="/requests/:id" element={
-                <ProtectedRoute>
-                  <RequestDetailPage />
-                </ProtectedRoute>
-              } />
+            <Route path="/requests/:id" element={
+              <ProtectedRoute>
+                <RequestDetailPage />
+              </ProtectedRoute>
+            } />
 
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <SettingsPage />
-                </ProtectedRoute>
-              } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <SettingsPage />
+              </ProtectedRoute>
+            } />
 
-              <Route path="/guide" element={
-                <ProtectedRoute>
-                  <GuidePage />
-                </ProtectedRoute>
-              } />
-            </Routes>
-          </Router>
-        </NotificationProvider>
-      </AuthProvider>
+            <Route path="/guide" element={
+              <ProtectedRoute>
+                <GuidePage />
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </Router>
+      </NotificationProvider>
+    </AuthProvider>
     </ConfigProvider>
   );
 };
