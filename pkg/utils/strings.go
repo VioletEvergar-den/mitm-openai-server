@@ -1,10 +1,10 @@
 package utils
 
 import (
-	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
+	"math/rand"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -42,12 +42,19 @@ func TruncateString(s string, maxLen int, suffix string) string {
 //   - string: 随机字符串
 //   - error: 生成过程中的错误，如果成功则为nil
 func GenerateRandomString(length int) (string, error) {
-	b := make([]byte, length)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
+	// 字符集
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	// 创建一个基于当前时间的随机源
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	// 生成随机字符串
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		result[i] = charset[r.Intn(len(charset))]
 	}
 
-	return hex.EncodeToString(b)[:length], nil
+	return string(result), nil
 }
 
 // GenerateRandomPassword 生成随机密码
@@ -57,20 +64,24 @@ func GenerateRandomString(length int) (string, error) {
 //
 // 返回:
 //   - string: 随机密码
-//   - error: 生成过程中的错误，如果成功则为nil
-func GenerateRandomPassword(length int) (string, error) {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+=-"
-	bytes := make([]byte, length)
-
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
+func GenerateRandomPassword(length int) string {
+	if length < 8 {
+		length = 8 // 确保最小长度为8
 	}
 
-	for i, b := range bytes {
-		bytes[i] = charset[b%byte(len(charset))]
+	// 字符集
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+"
+
+	// 随机种子
+	rand.Seed(time.Now().UnixNano())
+
+	// 生成密码
+	password := make([]byte, length)
+	for i := 0; i < length; i++ {
+		password[i] = charset[rand.Intn(len(charset))]
 	}
 
-	return string(bytes), nil
+	return string(password)
 }
 
 // Base64Encode 将字节数组编码为Base64字符串
