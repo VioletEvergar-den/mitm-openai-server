@@ -13,6 +13,8 @@
 
 # Dependency directories
 vendor/
+node_modules/
+react-ui/node_modules/
 
 # Go workspace file
 go.work
@@ -54,6 +56,14 @@ mitm-openai-server.exe
 
 # 调试文件
 __debug_bin*
+
+# React构建文件
+/react-ui/build/
+/react-ui/dist/
+/react-ui/.vite/
+
+# 忽略Go模块缓存（错误放置在react-ui目录）
+react-ui/pkg/
 
 
 
