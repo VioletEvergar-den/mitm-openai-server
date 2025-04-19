@@ -8,12 +8,14 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/llm-sec/mitm-openai-server/pkg/embed"
 	"github.com/llm-sec/mitm-openai-server/pkg/openai"
 	"github.com/llm-sec/mitm-openai-server/pkg/storage"
 	"github.com/llm-sec/mitm-openai-server/pkg/utils"
@@ -133,8 +135,8 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 		default:
 			// 不支持的认证类型，拒绝访问
 			c.JSON(http.StatusUnauthorized, StandardResponse{
-				Status:  "error",
-				Message: "认证配置错误",
+				Code: 10001,
+				Msg:  "认证配置错误",
 			})
 			c.Abort()
 			return
@@ -143,8 +145,8 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 		// 认证失败，返回401状态码
 		if !authorized {
 			c.JSON(http.StatusUnauthorized, StandardResponse{
-				Status:  "error",
-				Message: "认证失败",
+				Code: 10002,
+				Msg:  "认证失败",
 			})
 			c.Abort()
 			return
@@ -232,21 +234,13 @@ func (s *Server) setupRoutes() {
 	// OpenAPI规范路由
 	s.router.GET("/openai.json", s.ServeOpenAISpec)
 
-	// 如果根路径访问，重定向到UI
-	s.router.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, "/ui/")
-	})
-
-	// UI登录API端点
-	s.router.POST("/api/ui/login", s.handleUILogin)
-
 	// API路由组，有认证中间件保护
 	apiGroup := s.router.Group("/api")
 	apiGroup.Use(s.authMiddleware())
 	apiGroup.Use(s.apiMiddleware())
 
 	// 请求管理路由
-	apiGroup.GET("/requests", s.getAllRequests)
+	apiGroup.GET("/requests", s.getRequests)
 	apiGroup.GET("/requests/:id", s.getRequestByID)
 	apiGroup.DELETE("/requests/:id", s.deleteRequest)
 	apiGroup.DELETE("/requests", s.deleteAllRequests)
@@ -281,114 +275,71 @@ func (s *Server) setupUIRoutes() {
 		uiPath = "./ui" // 默认UI目录
 	}
 
-	// UI API认证中间件
-	uiAuth := func(c *gin.Context) {
-		username, password, ok := c.Request.BasicAuth()
-		if !ok || username != s.config.UIUsername || password != s.config.UIPassword {
-			c.Header("WWW-Authenticate", "Basic realm=UI Access")
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
+	// 获取文件系统
+	fileSystem := embed.GetFS(uiPath)
+
+	// UI API路由组 - 需要认证
+	uiAPI := s.router.Group("/ui/api")
+	uiAPI.Use(s.authMiddleware())
+
+	// UI 登录接口 - 登录接口不需要认证
+	s.router.POST("/ui/api/login", s.handleUILogin)
+
+	// 请求相关接口
+	uiAPI.GET("/requests", s.getRequests)
+	uiAPI.GET("/requests/:id", s.getRequestByID)
+	uiAPI.DELETE("/requests/:id", s.deleteRequest)
+	uiAPI.DELETE("/requests", s.deleteAllRequests)
+
+	// 文件导出
+	uiAPI.GET("/export", s.exportRequests)
+
+	// 存储统计
+	uiAPI.GET("/storage-stats", s.getStorageStats)
+
+	// 服务器信息
+	uiAPI.GET("/server-info", s.getServerInfo)
+
+	// 代理配置
+	uiAPI.GET("/proxy-config", s.getProxyConfig)
+	uiAPI.POST("/proxy-config", s.saveProxyConfig)
+
+	// 单独处理基本UI路由，确保index.html总是被加载
+	s.router.GET("/ui", func(c *gin.Context) {
+		c.File(embed.ResolvePath(uiPath, "index.html"))
+	})
+	s.router.GET("/ui/", func(c *gin.Context) {
+		c.File(embed.ResolvePath(uiPath, "index.html"))
+	})
+
+	// 根路径直接提供内容，不重定向
+	s.router.GET("/", func(c *gin.Context) {
+		c.File(embed.ResolvePath(uiPath, "index.html"))
+	})
+
+	// 处理静态文件，注意顺序
+	s.router.StaticFS("/ui/static", fileSystem)
+	s.router.StaticFS("/ui/css", fileSystem)
+	s.router.StaticFS("/ui/js", fileSystem)
+	s.router.StaticFS("/ui/assets", fileSystem)
+
+	// 根路径下的静态文件
+	s.router.StaticFS("/static", fileSystem)
+	s.router.StaticFS("/css", fileSystem)
+	s.router.StaticFS("/js", fileSystem)
+	s.router.StaticFS("/assets", fileSystem)
+
+	// 任何未处理的UI路由都重定向到index.html，实现SPA路由
+	s.router.NoRoute(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/ui/") {
+			c.File(embed.ResolvePath(uiPath, "index.html"))
+		} else if !strings.HasPrefix(c.Request.URL.Path, "/api/") &&
+			!strings.HasPrefix(c.Request.URL.Path, "/v1/") {
+			// 对于非API路径的请求，也返回前端应用
+			c.File(embed.ResolvePath(uiPath, "index.html"))
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
 		}
-		c.Next()
-	}
-
-	// 注册UI API路由
-	uiApiGroup := s.router.Group("/ui/api")
-	uiApiGroup.Use(uiAuth)
-	{
-		// 获取所有请求
-		uiApiGroup.GET("/requests", func(c *gin.Context) {
-			requests, err := s.storage.GetAllRequests(100, 0)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-
-			// 转换为服务器请求格式
-			serverRequests := make([]*Request, len(requests))
-			for i, req := range requests {
-				serverRequests[i] = convertStorageToServerRequest(req)
-			}
-
-			c.JSON(http.StatusOK, serverRequests)
-		})
-
-		// 获取单个请求详情
-		uiApiGroup.GET("/requests/:id", func(c *gin.Context) {
-			id := c.Param("id")
-			request, err := s.storage.GetRequestByID(id)
-			if err != nil {
-				c.JSON(http.StatusNotFound, gin.H{"error": "请求不存在"})
-				return
-			}
-			c.JSON(http.StatusOK, convertStorageToServerRequest(request))
-		})
-
-		// 删除单个请求
-		uiApiGroup.DELETE("/requests/:id", func(c *gin.Context) {
-			id := c.Param("id")
-			if err := s.storage.DeleteRequest(id); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-			c.JSON(http.StatusOK, gin.H{"success": true})
-		})
-
-		// 获取服务器信息
-		uiApiGroup.GET("/server-info", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{
-				"version":     "1.0.0",
-				"apiBasePath": "/",
-				"openApiPath": "/openai.json",
-				"auth": gin.H{
-					"enabled": s.config.EnableAuth,
-					"type":    s.config.AuthType,
-				},
-				"proxy": gin.H{
-					"enabled":   s.config.ProxyMode,
-					"targetURL": s.config.TargetURL,
-				},
-			})
-		})
-
-		// 获取存储统计信息
-		uiApiGroup.GET("/storage-stats", func(c *gin.Context) {
-			stats, err := s.storage.GetStats()
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-			c.JSON(http.StatusOK, stats)
-		})
-
-		// 清空所有请求
-		uiApiGroup.DELETE("/requests", func(c *gin.Context) {
-			if err := s.storage.DeleteAllRequests(); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-			c.JSON(http.StatusOK, gin.H{"success": true})
-		})
-	}
-
-	// 直接在主路由上注册UI路径处理程序
-	s.router.Use(func(c *gin.Context) {
-		path := c.Request.URL.Path
-		if strings.HasPrefix(path, "/ui/") || path == "/ui" {
-			// 如果路径结尾是/ui，重定向到/ui/
-			if path == "/ui" {
-				c.Redirect(http.StatusMovedPermanently, "/ui/")
-				c.Abort()
-				return
-			}
-
-			// 提供静态文件
-			fileServer := http.StripPrefix("/ui", http.FileServer(http.Dir(uiPath)))
-			fileServer.ServeHTTP(c.Writer, c.Request)
-			c.Abort()
-			return
-		}
-		c.Next()
 	})
 }
 
@@ -518,8 +469,8 @@ func (s *Server) apiMiddleware() gin.HandlerFunc {
 			if err != nil {
 				// 如果读取失败，记录错误并继续
 				c.JSON(http.StatusInternalServerError, StandardResponse{
-					Status:  "error",
-					Message: "无法读取请求体: " + err.Error(),
+					Code: 10005,
+					Msg:  "无法读取请求体: " + err.Error(),
 				})
 				c.Abort()
 				return
@@ -746,55 +697,72 @@ func convertStorageToServerRequest(req *storage.Request) *Request {
 	return serverReq
 }
 
-// getAllRequests 获取所有记录的请求
-// 处理GET /api/requests请求，支持分页查询
-// 参数:
-//   - c: Gin上下文
-func (s *Server) getAllRequests(c *gin.Context) {
-	// 获取分页参数
-	limit := 20 // 默认每页20条
-	offset := 0 // 默认从0开始
+// getPaginationParams 从请求中获取分页参数
+func getPaginationParams(c *gin.Context) (page, size int) {
+	page = 1  // 默认页码为1
+	size = 20 // 默认每页20条
 
 	// 解析查询参数
-	limitParam := c.Query("limit")
-	offsetParam := c.Query("offset")
+	pageParam := c.Query("page")
+	sizeParam := c.Query("size")
 
-	// 转换限制参数
-	if limitParam != "" {
-		if _, err := fmt.Sscanf(limitParam, "%d", &limit); err != nil {
-			limit = 20 // 参数无效时使用默认值
+	// 转换页码参数
+	if pageParam != "" {
+		if parsedPage, err := strconv.Atoi(pageParam); err == nil && parsedPage > 0 {
+			page = parsedPage
 		}
 	}
 
-	// 转换偏移参数
-	if offsetParam != "" {
-		if _, err := fmt.Sscanf(offsetParam, "%d", &offset); err != nil {
-			offset = 0 // 参数无效时使用默认值
+	// 转换每页大小参数
+	if sizeParam != "" {
+		if parsedSize, err := strconv.Atoi(sizeParam); err == nil && parsedSize > 0 {
+			size = parsedSize
 		}
 	}
 
-	// 从存储中获取请求
+	return page, size
+}
+
+// getRequests 获取请求列表
+// 参数:
+//   - c: Gin上下文
+func (s *Server) getRequests(c *gin.Context) {
+	// 处理分页参数
+	page, size := getPaginationParams(c)
+	limit := size
+	offset := (page - 1) * size
+
+	// 从存储中获取请求列表
 	requests, err := s.storage.GetAllRequests(limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, StandardResponse{
-			Status:  "error",
-			Message: "获取请求列表失败: " + err.Error(),
+			Code: 10012,
+			Msg:  "获取请求列表失败: " + err.Error(),
 		})
 		return
 	}
 
-	// 转换为服务器请求模型
-	var serverRequests []*Request
-	for _, req := range requests {
-		serverReq := convertStorageToServerRequest(req)
-		serverRequests = append(serverRequests, serverReq)
+	// 获取总请求数
+	// 尝试使用s.storage.GetRequestsCount()，如果不存在则返回请求列表的长度
+	var total int64
+	total = int64(len(requests))
+
+	// 将存储请求转换为服务器请求
+	serverRequests := make([]*Request, len(requests))
+	for i, req := range requests {
+		serverRequests[i] = convertStorageToServerRequest(req)
 	}
 
-	// 返回请求列表
+	// 返回请求列表和分页信息
 	c.JSON(http.StatusOK, StandardResponse{
-		Status:  "success",
-		Message: fmt.Sprintf("找到 %d 个请求", len(serverRequests)),
-		Data:    serverRequests,
+		Code: 0,
+		Msg:  "获取请求列表成功",
+		Data: map[string]interface{}{
+			"requests": serverRequests,
+			"total":    total,
+			"page":     page,
+			"size":     size,
+		},
 	})
 }
 
@@ -807,8 +775,8 @@ func (s *Server) getRequestByID(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
 		c.JSON(http.StatusBadRequest, StandardResponse{
-			Status:  "error",
-			Message: "请求ID不能为空",
+			Code: 10003,
+			Msg:  "请求ID不能为空",
 		})
 		return
 	}
@@ -817,8 +785,8 @@ func (s *Server) getRequestByID(c *gin.Context) {
 	req, err := s.storage.GetRequestByID(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, StandardResponse{
-			Status:  "error",
-			Message: "请求不存在: " + err.Error(),
+			Code: 10004,
+			Msg:  "请求不存在: " + err.Error(),
 		})
 		return
 	}
@@ -828,9 +796,9 @@ func (s *Server) getRequestByID(c *gin.Context) {
 
 	// 返回请求详情
 	c.JSON(http.StatusOK, StandardResponse{
-		Status:  "success",
-		Message: "请求获取成功",
-		Data:    serverReq,
+		Code: 0,
+		Msg:  "请求获取成功",
+		Data: serverReq,
 	})
 }
 
@@ -843,8 +811,8 @@ func (s *Server) deleteRequest(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
 		c.JSON(http.StatusBadRequest, StandardResponse{
-			Status:  "error",
-			Message: "请求ID不能为空",
+			Code: 10006,
+			Msg:  "请求ID不能为空",
 		})
 		return
 	}
@@ -858,16 +826,16 @@ func (s *Server) deleteRequest(c *gin.Context) {
 		}
 
 		c.JSON(statusCode, StandardResponse{
-			Status:  "error",
-			Message: "删除请求失败: " + err.Error(),
+			Code: 10007,
+			Msg:  "删除请求失败: " + err.Error(),
 		})
 		return
 	}
 
 	// 返回成功响应
 	c.JSON(http.StatusOK, StandardResponse{
-		Status:  "success",
-		Message: "请求已成功删除",
+		Code: 0,
+		Msg:  "请求已成功删除",
 	})
 }
 
@@ -880,16 +848,16 @@ func (s *Server) deleteAllRequests(c *gin.Context) {
 	err := s.storage.DeleteAllRequests()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, StandardResponse{
-			Status:  "error",
-			Message: "删除所有请求失败: " + err.Error(),
+			Code: 10008,
+			Msg:  "删除所有请求失败: " + err.Error(),
 		})
 		return
 	}
 
 	// 返回成功响应
 	c.JSON(http.StatusOK, StandardResponse{
-		Status:  "success",
-		Message: "所有请求已成功删除",
+		Code: 0,
+		Msg:  "所有请求已成功删除",
 	})
 }
 
@@ -902,16 +870,16 @@ func (s *Server) exportRequests(c *gin.Context) {
 	filePath, err := s.storage.ExportRequests()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, StandardResponse{
-			Status:  "error",
-			Message: "导出请求失败: " + err.Error(),
+			Code: 10009,
+			Msg:  "导出请求失败: " + err.Error(),
 		})
 		return
 	}
 
 	// 返回导出文件路径
 	c.JSON(http.StatusOK, StandardResponse{
-		Status:  "success",
-		Message: "请求已成功导出",
+		Code: 0,
+		Msg:  "请求已成功导出",
 		Data: map[string]string{
 			"file_path": filePath,
 		},
@@ -923,21 +891,21 @@ func (s *Server) exportRequests(c *gin.Context) {
 // 参数:
 //   - c: Gin上下文
 func (s *Server) getStorageStats(c *gin.Context) {
-	// 从存储中获取统计信息
+	// 获取存储统计信息
 	stats, err := s.storage.GetStats()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, StandardResponse{
-			Status:  "error",
-			Message: "获取存储统计失败: " + err.Error(),
+			Code: 10010,
+			Msg:  "获取存储统计信息失败: " + err.Error(),
 		})
 		return
 	}
 
 	// 返回统计信息
 	c.JSON(http.StatusOK, StandardResponse{
-		Status:  "success",
-		Message: "存储统计获取成功",
-		Data:    stats,
+		Code: 0,
+		Msg:  "获取存储统计信息成功",
+		Data: stats,
 	})
 }
 
@@ -1067,36 +1035,27 @@ func (s *Server) handleV1UserByID(c *gin.Context) {
 	}
 }
 
-// handleV1Echo 处理V1版本Echo请求
-// 处理POST /v1/echo请求，返回请求信息
+// handleV1Echo 处理回显请求
+// 这是一个简单的测试端点，将请求数据回显给调用方
 // 参数:
 //   - c: Gin上下文
 func (s *Server) handleV1Echo(c *gin.Context) {
-	// 解析请求体
-	var requestBody map[string]interface{}
-	if err := c.ShouldBindJSON(&requestBody); err != nil {
-		requestBody = map[string]interface{}{} // 使用空对象
+	// 从请求中获取数据
+	var data map[string]interface{}
+	if err := c.ShouldBindJSON(&data); err != nil {
+		c.JSON(http.StatusBadRequest, StandardResponse{
+			Code: 10011,
+			Msg:  "无效的请求数据: " + err.Error(),
+		})
+		return
 	}
 
-	// 构建响应
-	response := map[string]interface{}{
-		"request_id": uuid.New().String(),
-		"timestamp":  time.Now().Format(time.RFC3339),
-		"method":     c.Request.Method,
-		"path":       c.Request.URL.Path,
-		"headers":    c.Request.Header,
-		"query":      c.Request.URL.Query(),
-		"body":       requestBody,
-		"ip":         c.ClientIP(),
-	}
-
-	// 如果请求体中有message字段，回显它
-	if message, exists := requestBody["message"]; exists {
-		response["message"] = message
-	}
-
-	// 返回响应
-	c.JSON(http.StatusOK, response)
+	// 回显数据
+	c.JSON(http.StatusOK, StandardResponse{
+		Code: 0,
+		Msg:  "回显成功",
+		Data: data,
+	})
 }
 
 // handleV2Users 处理V2版本用户列表请求
@@ -1398,3 +1357,222 @@ func (s *Server) handleUILogin(c *gin.Context) {
 		"message": "用户名或密码错误",
 	})
 }
+
+// getServerInfo 返回服务器信息
+// 返回服务器的基本配置信息，包括版本、API路径和认证设置
+// 参数:
+//   - c: Gin上下文
+func (s *Server) getServerInfo(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"version":     "1.0.0",
+		"apiBasePath": "/",
+		"openApiPath": "/openai.json",
+		"auth": gin.H{
+			"enabled": s.config.EnableAuth,
+			"type":    s.config.AuthType,
+		},
+		"proxy": gin.H{
+			"enabled":   s.config.ProxyMode,
+			"targetURL": s.config.TargetURL,
+		},
+	})
+}
+
+// getProxyConfig 获取代理配置
+// 参数:
+//   - c: Gin上下文
+func (s *Server) getProxyConfig(c *gin.Context) {
+	// 构建代理配置响应
+	config := map[string]interface{}{
+		"enabled":       s.config.ProxyMode,
+		"target_url":    s.config.TargetURL,
+		"auth_type":     s.config.TargetAuthType,
+		"target_auth":   s.config.TargetAuthType != "none",
+		"target_user":   s.config.TargetUsername,
+		"target_passwd": "******", // 密码隐藏
+		"target_token":  "******", // 令牌隐藏
+	}
+
+	// 返回配置
+	c.JSON(http.StatusOK, StandardResponse{
+		Code: 0,
+		Msg:  "代理配置获取成功",
+		Data: config,
+	})
+}
+
+// saveProxyConfig 保存代理配置
+// 更新服务器的代理配置
+// 参数:
+//   - c: Gin上下文
+func (s *Server) saveProxyConfig(c *gin.Context) {
+	var config struct {
+		Enabled      bool   `json:"enabled"`
+		TargetURL    string `json:"targetURL"`
+		AuthType     string `json:"authType"`
+		TargetUser   string `json:"targetUser"`
+		TargetPasswd string `json:"targetPasswd"`
+		TargetToken  string `json:"targetToken"`
+	}
+
+	if err := c.ShouldBindJSON(&config); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "无效的请求格式",
+		})
+		return
+	}
+
+	// 更新配置
+	s.config.ProxyMode = config.Enabled
+	s.config.TargetURL = config.TargetURL
+	s.config.TargetAuthType = config.AuthType
+
+	// 只有在提供了新值时才更新凭据
+	if config.TargetUser != "" {
+		s.config.TargetUsername = config.TargetUser
+	}
+	if config.TargetPasswd != "" && config.TargetPasswd != strings.Repeat("*", len(s.config.TargetPassword)) {
+		s.config.TargetPassword = config.TargetPasswd
+	}
+	if config.TargetToken != "" && config.TargetToken != strings.Repeat("*", len(s.config.TargetToken)) {
+		s.config.TargetToken = config.TargetToken
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "代理配置已更新",
+	})
+}
+
+// prepareReplayRequest 准备用于重播的HTTP请求
+func prepareReplayRequest(storedReq *storage.Request) (*http.Request, error) {
+	// 创建URL
+	// 从storedReq.Path构建URL，storedReq.URL不可用
+	reqURL := storedReq.Path
+	if !strings.HasPrefix(reqURL, "http") {
+		reqURL = "https://" + reqURL
+	}
+
+	// 从Body创建请求体，Body可能是接口类型，需要进行类型转换
+	var bodyReader io.Reader
+	if storedReq.Body != nil {
+		switch body := storedReq.Body.(type) {
+		case string:
+			bodyReader = strings.NewReader(body)
+		case []byte:
+			bodyReader = bytes.NewReader(body)
+		default:
+			// 如果是其他类型，尝试将其转换为JSON字符串
+			bodyBytes, err := json.Marshal(storedReq.Body)
+			if err != nil {
+				return nil, fmt.Errorf("无法序列化请求体: %v", err)
+			}
+			bodyReader = bytes.NewReader(bodyBytes)
+		}
+	}
+
+	// 创建请求
+	req, err := http.NewRequest(storedReq.Method, reqURL, bodyReader)
+	if err != nil {
+		return nil, err
+	}
+
+	// 复制原始请求的头部，需要先进行类型断言
+	switch headers := storedReq.Headers.(type) {
+	case map[string][]string:
+		for key, values := range headers {
+			for _, value := range values {
+				req.Header.Add(key, value)
+			}
+		}
+	case map[string]string:
+		for key, value := range headers {
+			req.Header.Add(key, value)
+		}
+	}
+
+	return req, nil
+}
+
+// replayRequest 重播请求
+// 参数:
+//   - c: Gin上下文
+func (s *Server) replayRequest(c *gin.Context) {
+	// 提取请求ID
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, StandardResponse{
+			Code: 10013,
+			Msg:  "请求ID不能为空",
+		})
+		return
+	}
+
+	// 从存储中获取请求
+	storedReq, err := s.storage.GetRequestByID(id)
+	if err != nil {
+		if err.Error() == "request not found" {
+			c.JSON(http.StatusNotFound, StandardResponse{
+				Code: 10014,
+				Msg:  "请求不存在: " + id,
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, StandardResponse{
+			Code: 10015,
+			Msg:  "获取请求失败: " + err.Error(),
+		})
+		return
+	}
+
+	// 准备重播请求
+	replayReq, err := prepareReplayRequest(storedReq)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, StandardResponse{
+			Code: 10016,
+			Msg:  "准备重播请求失败: " + err.Error(),
+		})
+		return
+	}
+
+	// 发送重播请求
+	resp, err := httpClient.Do(replayReq)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, StandardResponse{
+			Code: 10017,
+			Msg:  "发送重播请求失败: " + err.Error(),
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	// 读取响应体
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, StandardResponse{
+			Code: 10018,
+			Msg:  "读取响应失败: " + err.Error(),
+		})
+		return
+	}
+
+	// 返回重播结果
+	c.JSON(http.StatusOK, StandardResponse{
+		Code: 0,
+		Msg:  "重播请求成功",
+		Data: map[string]interface{}{
+			"status_code": resp.StatusCode,
+			"headers":     resp.Header,
+			"body":        string(respBody),
+		},
+	})
+}
+
+// 添加必要的变量
+var (
+	// httpClient 是用于发送HTTP请求的客户端
+	httpClient = &http.Client{
+		Timeout: 30 * time.Second,
+	}
+)

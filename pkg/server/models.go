@@ -30,11 +30,11 @@ type ProxyResponse struct {
 }
 
 // StandardResponse 表示API返回的标准响应
-// 用于统一API响应格式，包含状态、消息和数据
+// 用于统一API响应格式，包含状态码、消息和数据
 type StandardResponse struct {
-	Status  string      `json:"status"`         // 状态：success或error
-	Message string      `json:"message"`        // 响应消息
-	Data    interface{} `json:"data,omitempty"` // 响应数据，可选
+	Code int         `json:"code"`           // 状态码：0表示成功，非0表示各种错误
+	Msg  string      `json:"msg"`            // 响应消息
+	Data interface{} `json:"data,omitempty"` // 响应数据，可选
 }
 
 // ServerConfig 存储服务器配置
