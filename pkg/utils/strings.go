@@ -69,8 +69,9 @@ func GenerateRandomPassword(length int) string {
 		length = 8 // 确保最小长度为8
 	}
 
-	// 字符集
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+"
+	// 修改字符集，移除可能导致问题的特殊字符
+	// 原来的字符集: const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+"
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
 
 	// 随机种子
 	rand.Seed(time.Now().UnixNano())

@@ -86,11 +86,17 @@ func (s *UIServer) HandleUILogin(c *gin.Context) {
 		return
 	}
 
+	// 打印调试信息
+	fmt.Printf("登录请求:\n用户名: %s\n收到的密码: %s\n配置中的密码: %s\n",
+		loginReq.Username, loginReq.Password, s.config.UIPassword)
+
 	// 验证用户名和密码
 	if loginReq.Username == s.config.UIUsername && loginReq.Password == s.config.UIPassword {
 		// 登录成功，生成一个简单的会话令牌
 		// 实际应用中应使用更安全的会话管理
 		token := fmt.Sprintf("%s_%d", uuid.New().String(), time.Now().Unix())
+
+		fmt.Println("登录成功!")
 
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",
@@ -101,6 +107,8 @@ func (s *UIServer) HandleUILogin(c *gin.Context) {
 	}
 
 	// 登录失败
+	fmt.Println("登录失败: 用户名或密码不匹配")
+
 	c.JSON(http.StatusUnauthorized, gin.H{
 		"status":  "error",
 		"message": "用户名或密码错误",
