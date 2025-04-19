@@ -95,10 +95,7 @@ func TestGenerateRandomPassword(t *testing.T) {
 
 	for _, length := range lengths {
 		t.Run(fmt.Sprintf("长度为%d", length), func(t *testing.T) {
-			password, err := GenerateRandomPassword(length)
-			if err != nil {
-				t.Fatalf("GenerateRandomPassword(%d)错误: %v", length, err)
-			}
+			password := GenerateRandomPassword(length)
 
 			if len(password) != length {
 				t.Errorf("GenerateRandomPassword(%d)生成的密码长度为 %d, 期望 %d", length, len(password), length)
@@ -113,10 +110,7 @@ func TestGenerateRandomPassword(t *testing.T) {
 			}
 
 			// 检查随机性，两次调用应该生成不同的密码
-			password2, err := GenerateRandomPassword(length)
-			if err != nil {
-				t.Fatalf("第二次GenerateRandomPassword(%d)错误: %v", length, err)
-			}
+			password2 := GenerateRandomPassword(length)
 
 			if password == password2 {
 				t.Errorf("两次调用GenerateRandomPassword(%d)生成了相同的密码: %s", length, password)
