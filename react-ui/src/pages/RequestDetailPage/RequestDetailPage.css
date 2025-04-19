@@ -7,6 +7,7 @@
 }
 
 .detail-title {
+  margin: 0;
   font-size: 1.5rem;
 }
 
@@ -15,20 +16,56 @@
 }
 
 .detail-section-title {
+  margin-top: 0;
+  margin-bottom: 15px;
   font-size: 1.2rem;
-  margin-bottom: 10px;
-  font-weight: 600;
-  color: #343a40;
-  border-bottom: 1px solid #ddd;
-  padding-bottom: 5px;
+  border-bottom: 1px solid #eaeaea;
+  padding-bottom: 8px;
 }
 
+/* JSON查看器样式增强 */
 .json-viewer {
-  background-color: #f8f9fa;
-  padding: 15px;
-  border-radius: 4px;
-  font-family: monospace;
-  overflow-x: auto;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.json-viewer:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* 响应状态码颜色 */
+.status-2xx {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.status-3xx {
+  color: #fd7e14;
+  font-weight: bold;
+}
+
+.status-4xx, .status-5xx {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+/* 响应详情部分 */
+.response-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.response-section {
+  margin-bottom: 20px;
+}
+
+.response-section h4 {
+  margin-bottom: 10px;
+  font-size: 1.1rem;
 }
 
 /* 移动设备响应式 */

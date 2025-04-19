@@ -4,6 +4,8 @@ import Layout from '../../components/Layout';
 import { Request } from '../../types';
 import { apiService, utils } from '../../services/api';
 import { useNotification } from '../../components/Notification';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import './RequestDetailPage.css';
 import '../../styles/components/Table';
 
@@ -145,23 +147,29 @@ const RequestDetailPage: React.FC = () => {
 
         <div className="detail-section">
           <h3 className="detail-section-title">请求头</h3>
-          <pre className="json-viewer">
-            {request?.headers ? JSON.stringify(request.headers, null, 2) : ''}
-          </pre>
+          <div className="json-viewer">
+            <SyntaxHighlighter language="json" style={vscDarkPlus}>
+              {request?.headers ? JSON.stringify(request.headers, null, 2) : ''}
+            </SyntaxHighlighter>
+          </div>
         </div>
 
         <div className="detail-section">
           <h3 className="detail-section-title">查询参数</h3>
-          <pre className="json-viewer">
-            {request?.query ? JSON.stringify(request.query, null, 2) : ''}
-          </pre>
+          <div className="json-viewer">
+            <SyntaxHighlighter language="json" style={vscDarkPlus}>
+              {request?.query ? JSON.stringify(request.query, null, 2) : ''}
+            </SyntaxHighlighter>
+          </div>
         </div>
 
         <div className="detail-section">
           <h3 className="detail-section-title">请求体</h3>
-          <pre className="json-viewer">
-            {request?.body ? JSON.stringify(request.body, null, 2) : ''}
-          </pre>
+          <div className="json-viewer">
+            <SyntaxHighlighter language="json" style={vscDarkPlus}>
+              {request?.body ? JSON.stringify(request.body, null, 2) : ''}
+            </SyntaxHighlighter>
+          </div>
         </div>
 
         {request?.response && (
@@ -178,17 +186,21 @@ const RequestDetailPage: React.FC = () => {
               {request.response.headers && Object.keys(request.response.headers).length > 0 && (
                 <div className="response-section">
                   <h4>响应头</h4>
-                  <pre className="json-viewer">
-                    {JSON.stringify(request.response.headers, null, 2)}
-                  </pre>
+                  <div className="json-viewer">
+                    <SyntaxHighlighter language="json" style={vscDarkPlus}>
+                      {JSON.stringify(request.response.headers, null, 2)}
+                    </SyntaxHighlighter>
+                  </div>
                 </div>
               )}
               
               <div className="response-section">
                 <h4>响应体</h4>
-                <pre className="json-viewer">
-                  {request.response.body ? JSON.stringify(request.response.body, null, 2) : ''}
-                </pre>
+                <div className="json-viewer">
+                  <SyntaxHighlighter language="json" style={vscDarkPlus}>
+                    {request.response.body ? JSON.stringify(request.response.body, null, 2) : ''}
+                  </SyntaxHighlighter>
+                </div>
               </div>
             </div>
           </div>
