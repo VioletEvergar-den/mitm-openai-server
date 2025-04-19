@@ -1,19 +1,23 @@
 /* JSON查看器样式增强 */
 .json-viewer {
   border-radius: 8px;
-  overflow: auto;
+  overflow: auto !important; /* 强制使用滚动 */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   margin-top: 10px;
   margin-bottom: 10px;
-  max-height: 500px; /* 限制最大高度，避免内容过长 */
+  max-height: 600px; /* 增加最大高度 */
+  width: 100% !important; /* 确保宽度占满 */
 }
 
 /* 针对react-json-pretty组件的自定义样式 */
 .json-viewer pre {
   margin: 0 !important;
   border-radius: 6px;
-  word-break: break-all; /* 确保长字符串正确换行 */
-  white-space: pre-wrap; /* 保留格式的同时允许换行 */
+  word-break: break-all !important; /* 确保长字符串正确换行 */
+  white-space: pre-wrap !important; /* 保留格式的同时允许换行 */
+  width: 100% !important;
+  overflow-wrap: break-word !important;
+  padding: 12px !important; /* 确保内容有足够的内边距 */
 }
 
 .json-viewer a {
@@ -23,8 +27,34 @@
 
 /* 确保JSON内容可以完整显示 */
 .json-viewer .json-pretty {
-  width: 100%;
-  overflow-x: auto;
+  width: 100% !important;
+  overflow-wrap: break-word !important;
+  max-width: 100% !important;
+  display: block !important;
+  white-space: pre-wrap !important;
+}
+
+/* JSON内容字符串样式 */
+.json-pretty .json-string {
+  word-break: break-all !important;
+  white-space: pre-wrap !important;
+  max-width: 100% !important;
+}
+
+/* 确保每个JSON行都能正确显示 */
+.json-pretty .json-key,
+.json-pretty .json-value {
+  display: inline-block;
+  word-break: break-all !important;
+  max-width: 100% !important;
+}
+
+/* 处理嵌套JSON对象 */
+.json-pretty .json-object,
+.json-pretty .json-array {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: block !important;
 }
 
 /* 复制按钮样式 */
@@ -39,6 +69,23 @@
   opacity: 1;
   background-color: rgba(0, 0, 0, 0.05);
   color: #1890ff;
+}
+
+/* 卡片样式优化 */
+.json-card-view {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.json-card-view .ant-card-body {
+  padding: 12px 16px !important;
+  overflow: auto !important;
+  max-height: 600px;
+}
+
+/* 用于响应内容的特殊处理 */
+.response-content .json-card-view .ant-card-body {
+  max-height: 700px;
 }
 
 .ant-card-small .ant-card-head {
@@ -60,5 +107,59 @@
 /* 确保卡片内容可以正确显示 */
 .ant-card-body {
   padding: 12px;
-  overflow: visible;
+  overflow: visible !important;
+  width: 100% !important;
+  display: block !important;
+}
+
+/* 针对响应标签的特殊处理 */
+.response-content .json-viewer {
+  max-height: 700px; /* 响应内容通常更长，增加最大高度 */
+}
+
+/* 嵌套对象的样式优化 */
+.json-pretty .object-key, 
+.json-pretty .array-key {
+  color: #333 !important;
+  margin-right: 5px !important;
+  font-weight: 600 !important;
+}
+
+/* 长字符串的处理 */
+.json-pretty .string-value {
+  color: #16a34a !important;
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
+  max-width: 100% !important;
+}
+
+/* 数字类型样式 */
+.json-pretty .number-value {
+  color: #2563eb !important;
+}
+
+/* 布尔值和空值样式 */
+.json-pretty .boolean-value,
+.json-pretty .null-value {
+  color: #b91c1c !important;
+}
+
+/* 折叠/展开控件的样式 */
+.json-pretty .toggle-button {
+  cursor: pointer;
+  margin-right: 5px;
+  font-weight: bold;
+}
+
+/* 嵌套层级缩进优化 */
+.json-pretty .indent {
+  margin-left: 16px !important;
+}
+
+/* 确保对象和数组的内容显示正确 */
+.json-pretty .object-content,
+.json-pretty .array-content {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
 } 
