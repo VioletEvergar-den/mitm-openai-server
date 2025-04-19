@@ -10,6 +10,65 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// createTestRequest 创建用于测试的请求对象
+func createTestRequest(id string) *Request {
+	return &Request{
+		ID:        id,
+		Method:    "POST",
+		Path:      "/api/test/" + id,
+		Timestamp: time.Now(),
+		Headers: map[string][]string{
+			"Content-Type": {"application/json"},
+			"User-Agent":   {"Test-Agent"},
+		},
+		Query: map[string][]string{
+			"param1": {"value1"},
+			"param2": {"value2"},
+		},
+		Body:     map[string]interface{}{"test": "data"},
+		ClientIP: "127.0.0.1",
+		Response: &ProxyResponse{
+			StatusCode: 200,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body:    map[string]interface{}{"status": "success"},
+			Latency: 50,
+		},
+	}
+}
+
+// testStorageReopen 测试存储重新打开的功能
+func testStorageReopen(t *testing.T, createStorageFn func() (Storage, error), cleanup func()) {
+	// 创建存储实例
+	storage, err := createStorageFn()
+	require.NoError(t, err)
+
+	// 添加测试数据
+	req := createTestRequest("reopen-test")
+	err = storage.SaveRequest(req)
+	require.NoError(t, err)
+
+	// 关闭存储
+	err = storage.Close()
+	require.NoError(t, err)
+
+	// 重新打开存储
+	storage, err = createStorageFn()
+	require.NoError(t, err)
+	defer storage.Close()
+
+	// 验证数据仍然存在
+	retrievedReq, err := storage.GetRequestByID("reopen-test")
+	require.NoError(t, err)
+	assert.Equal(t, "reopen-test", retrievedReq.ID)
+	assert.Equal(t, "/api/test/reopen-test", retrievedReq.Path)
+
+	// 清理测试数据
+	err = storage.DeleteRequest("reopen-test")
+	assert.NoError(t, err)
+}
+
 func TestSQLiteStorage(t *testing.T) {
 	// 创建临时SQLite数据库目录
 	tempDir, err := os.MkdirTemp("", "sqlite-storage-test-")
