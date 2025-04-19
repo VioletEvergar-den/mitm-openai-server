@@ -62,6 +62,9 @@ func (s *UIServer) SetupUIRoutes(router *gin.Engine, authMiddleware gin.HandlerF
 	uiAPI.GET("/proxy-config", s.GetProxyConfig)
 	uiAPI.POST("/proxy-config", s.SaveProxyConfig)
 
+	// 添加API Token获取接口
+	uiAPI.GET("/token", s.GetAPIToken)
+
 	// 添加聊天测试接口
 	uiAPI.POST("/chat", s.HandleUIChat)
 }
@@ -254,6 +257,28 @@ func (s *UIServer) HandleUIChat(c *gin.Context) {
 
 	// 返回OpenAI的原始响应
 	c.JSON(statusCode, responseBody)
+}
+
+// GetAPIToken 返回用于OpenAI API请求的token
+func (s *UIServer) GetAPIToken(c *gin.Context) {
+	// 根据不同的认证模式返回适当的token
+	var tokenValue string
+
+	if s.config.ProxyMode && s.config.TargetAuthType == "token" && s.config.TargetToken != "" {
+		// 如果是代理模式且使用token认证，返回目标API的token
+		tokenValue = s.config.TargetToken
+	} else {
+		// 否则返回默认token
+		tokenValue = "mt-mitm-server-token"
+	}
+
+	c.JSON(http.StatusOK, StandardResponse{
+		Code: 0,
+		Msg:  "获取API Token成功",
+		Data: map[string]string{
+			"token": tokenValue,
+		},
+	})
 }
 
 // 简单地从固定位置读取存储路径配置

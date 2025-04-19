@@ -44,10 +44,19 @@ func (h *OpenAIHandler) SetupOpenAIRoutes(router *gin.Engine, apiMiddleware gin.
 
 	// 使用更宽松的CORS设置，确保跨域请求能正常工作
 	openaiGroup.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		origin := c.Request.Header.Get("Origin")
+		if origin == "" {
+			// 如果没有Origin头，允许所有源
+			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		} else {
+			// 有Origin头，设置为请求的源
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, Authorization, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Max-Age", "86400") // 24小时
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -57,87 +66,73 @@ func (h *OpenAIHandler) SetupOpenAIRoutes(router *gin.Engine, apiMiddleware gin.
 	})
 
 	// 注册所有需要的OpenAI API路径
-	openaiGroup.POST("/chat/completions", h.HandleOpenAIRequest)
-	openaiGroup.POST("/completions", h.HandleOpenAIRequest)
-	openaiGroup.POST("/embeddings", h.HandleOpenAIRequest)
-	openaiGroup.GET("/models", h.HandleOpenAIRequest)
+	openaiGroup.POST("/chat/completions", h.HandleRequest)
+	openaiGroup.POST("/completions", h.HandleRequest)
+	openaiGroup.POST("/embeddings", h.HandleRequest)
+	openaiGroup.GET("/models", h.HandleRequest)
 
 	// 以下是更多可能需要的OpenAI API路径
-	openaiGroup.GET("/models/:model", h.HandleOpenAIRequest)
-	openaiGroup.POST("/images/generations", h.HandleOpenAIRequest)
-	openaiGroup.POST("/audio/transcriptions", h.HandleOpenAIRequest)
-	openaiGroup.POST("/audio/translations", h.HandleOpenAIRequest)
-	openaiGroup.POST("/fine-tuning/jobs", h.HandleOpenAIRequest)
-	openaiGroup.GET("/fine-tuning/jobs", h.HandleOpenAIRequest)
-	openaiGroup.GET("/fine-tuning/jobs/:job_id", h.HandleOpenAIRequest)
+	openaiGroup.GET("/models/:model", h.HandleRequest)
+	openaiGroup.POST("/images/generations", h.HandleRequest)
+	openaiGroup.POST("/audio/transcriptions", h.HandleRequest)
+	openaiGroup.POST("/audio/translations", h.HandleRequest)
+	openaiGroup.POST("/fine-tuning/jobs", h.HandleRequest)
+	openaiGroup.GET("/fine-tuning/jobs", h.HandleRequest)
+	openaiGroup.GET("/fine-tuning/jobs/:job_id", h.HandleRequest)
 }
 
-// HandleOpenAIRequest 处理OpenAI API请求
+// HandleRequest 处理OpenAI API请求
 // 根据配置，将请求代理到真实API或返回模拟响应
 // 参数:
 //   - c: Gin上下文
-func (h *OpenAIHandler) HandleOpenAIRequest(c *gin.Context) {
+func (h *OpenAIHandler) HandleRequest(c *gin.Context) {
 	// 获取请求方法和路径
 	method := c.Request.Method
-	path := c.Param("path")
+	path := c.Request.URL.Path
+	if len(path) > 3 && path[:3] == "/v1" {
+		path = path[3:] // 移除前缀"/v1"
+	}
 
 	// 读取请求体
-	var bodyBytes []byte
-	var err error
+	var body []byte
 	if c.Request.Body != nil {
-		bodyBytes, err = io.ReadAll(c.Request.Body)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": map[string]interface{}{
-					"message": "无法读取请求体: " + err.Error(),
-					"type":    "server_error",
-					"code":    "internal_server_error",
-				},
-			})
-			return
-		}
-		// 恢复请求体，以便其他中间件可以再次读取
-		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		body, _ = io.ReadAll(c.Request.Body)
+		// 重置请求体，以便后续处理
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
 	}
 
-	// 收集请求头
+	// 获取请求头和查询参数
 	headers := make(map[string]string)
-	for key, values := range c.Request.Header {
-		if len(values) > 0 {
-			headers[key] = values[0]
+	for k, v := range c.Request.Header {
+		if len(v) > 0 {
+			headers[k] = v[0]
 		}
 	}
 
-	// 收集查询参数
 	queryParams := make(map[string]string)
-	for key, values := range c.Request.URL.Query() {
-		if len(values) > 0 {
-			queryParams[key] = values[0]
+	for k, v := range c.Request.URL.Query() {
+		if len(v) > 0 {
+			queryParams[k] = v[0]
 		}
 	}
 
-	// 使用OpenAI服务处理请求
-	statusCode, responseHeaders, responseBody, err := h.openaiService.HandleRequest(
-		method, path, headers, queryParams, bodyBytes,
-	)
-
+	// 调用OpenAI服务处理请求
+	statusCode, respHeaders, respBody, err := h.openaiService.HandleRequest(method, path, headers, queryParams, body)
 	if err != nil {
-		// 发生错误，返回错误响应
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": map[string]interface{}{
-				"message": "处理请求失败: " + err.Error(),
-				"type":    "server_error",
-				"code":    "internal_server_error",
+				"message": fmt.Sprintf("处理请求失败: %v", err),
+				"type":    "internal_server_error",
 			},
 		})
 		return
 	}
 
 	// 设置响应头
-	for key, value := range responseHeaders {
-		c.Header(key, value)
+	for k, v := range respHeaders {
+		c.Header(k, v)
 	}
 
 	// 返回响应
-	c.JSON(statusCode, responseBody)
+	c.JSON(statusCode, respBody)
 }
