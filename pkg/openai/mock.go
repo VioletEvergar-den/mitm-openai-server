@@ -187,16 +187,16 @@ func (s *mockService) matchPath(method, path string) (mockHandler, map[string]st
 
 // registerHandlers 注册路径处理函数
 func (s *mockService) registerHandlers() {
-	// OpenAI API 路径
-	s.handlerMapping["POST /v1/chat/completions"] = s.handleChatCompletions
-	s.handlerMapping["POST /v1/completions"] = s.handleCompletions
-	s.handlerMapping["POST /v1/embeddings"] = s.handleEmbeddings
-	s.handlerMapping["POST /v1/images/generations"] = s.handleImagesGenerations
-	s.handlerMapping["POST /v1/audio/transcriptions"] = s.handleAudioTranscriptions
-	s.handlerMapping["POST /v1/moderations"] = s.handleModerations
+	// OpenAI API 路径 - 不包含/v1前缀，因为在handlers.go中已经移除
+	s.handlerMapping["POST /chat/completions"] = s.handleChatCompletions
+	s.handlerMapping["POST /completions"] = s.handleCompletions
+	s.handlerMapping["POST /embeddings"] = s.handleEmbeddings
+	s.handlerMapping["POST /images/generations"] = s.handleImagesGenerations
+	s.handlerMapping["POST /audio/transcriptions"] = s.handleAudioTranscriptions
+	s.handlerMapping["POST /moderations"] = s.handleModerations
 
 	// 模型列表API
-	s.handlerMapping["GET /v1/models"] = s.handleListModels
+	s.handlerMapping["GET /models"] = s.handleListModels
 }
 
 // 处理函数实现
