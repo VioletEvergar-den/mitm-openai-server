@@ -1,3 +1,46 @@
+/* 请求详情页全局样式 */
+.request-detail-container {
+  width: 100%;
+}
+
+/* 优化标签页样式 */
+.request-detail-container .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+.request-detail-container .ant-tabs-tab {
+  transition: all 0.3s;
+  padding: 8px 16px;
+}
+
+.request-detail-container .ant-tabs-tab-active {
+  font-weight: 500;
+}
+
+/* 标签标签容器 */
+.ant-tabs-nav {
+  margin-bottom: 16px !important;
+}
+
+/* 请求详情卡片 */
+.ant-card {
+  box-shadow: 0 1px 2px -2px rgba(0, 0, 0, 0.16), 
+              0 3px 6px 0 rgba(0, 0, 0, 0.12), 
+              0 5px 12px 4px rgba(0, 0, 0, 0.09);
+}
+
+/* 复制成功消息提示样式 */
+.ant-message-success .anticon {
+  color: #52c41a;
+}
+
+/* 移动设备响应式样式 */
+@media (max-width: 768px) {
+  .ant-space {
+    flex-wrap: wrap;
+  }
+}
+
 /* 请求详情页样式 */
 .detail-header {
   display: flex;
@@ -120,32 +163,6 @@
   border-bottom: 1px solid #f0f0f0;
 }
 
-/* 优化标签页样式 */
-.request-detail-container .ant-tabs-nav {
-  margin-bottom: 16px;
-}
-
-.request-detail-container .ant-tabs-tab {
-  transition: all 0.3s;
-  padding: 8px 16px;
-}
-
-.request-detail-container .ant-tabs-tab-active {
-  font-weight: 500;
-}
-
-/* 标签标签容器 */
-.ant-tabs-nav {
-  margin-bottom: 16px !important;
-}
-
-/* 请求详情卡片 */
-.ant-card {
-  box-shadow: 0 1px 2px -2px rgba(0, 0, 0, 0.16), 
-              0 3px 6px 0 rgba(0, 0, 0, 0.12), 
-              0 5px 12px 4px rgba(0, 0, 0, 0.09);
-}
-
 /* 响应时间显示 */
 .latency-badge {
   margin-left: 8px;
@@ -184,41 +201,6 @@
   font-size: 1.1rem;
 }
 
-/* 移动设备响应式 */
-@media (max-width: 768px) {
-  .detail-actions {
-    flex-direction: column;
-    gap: 10px;
-    align-items: flex-start;
-  }
-  
-  .detail-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .detail-title {
-    margin-bottom: 10px;
-  }
-  
-  .ant-card-head-wrapper {
-    flex-direction: column;
-  }
-  
-  .ant-card-head-title {
-    padding: 8px 0;
-  }
-  
-  .ant-card-extra {
-    margin-left: 0;
-    padding: 8px 0;
-  }
-  
-  .ant-space {
-    flex-wrap: wrap;
-  }
-}
-
 /* 复制按钮样式 */
 .ant-card-extra .ant-btn-text {
   opacity: 0.6;
@@ -247,9 +229,4 @@
 
 .ant-card-small .ant-card-extra {
   padding: 8px 0;
-}
-
-/* 复制成功消息提示样式 */
-.ant-message-success .anticon {
-  color: #52c41a;
 } 
