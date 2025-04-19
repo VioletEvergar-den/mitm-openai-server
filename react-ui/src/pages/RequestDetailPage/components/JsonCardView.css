@@ -1,21 +1,30 @@
 /* JSON查看器样式增强 */
 .json-viewer {
   border-radius: 8px;
-  overflow: hidden;
+  overflow: auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   margin-top: 10px;
   margin-bottom: 10px;
+  max-height: 500px; /* 限制最大高度，避免内容过长 */
 }
 
 /* 针对react-json-pretty组件的自定义样式 */
 .json-viewer pre {
   margin: 0 !important;
   border-radius: 6px;
+  word-break: break-all; /* 确保长字符串正确换行 */
+  white-space: pre-wrap; /* 保留格式的同时允许换行 */
 }
 
 .json-viewer a {
   color: inherit !important;
   text-decoration: none !important;
+}
+
+/* 确保JSON内容可以完整显示 */
+.json-viewer .json-pretty {
+  width: 100%;
+  overflow-x: auto;
 }
 
 /* 复制按钮样式 */
@@ -46,4 +55,10 @@
 
 .ant-card-small .ant-card-extra {
   padding: 8px 0;
+}
+
+/* 确保卡片内容可以正确显示 */
+.ant-card-body {
+  padding: 12px;
+  overflow: visible;
 } 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, Button, Tooltip, Typography } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
 import JSONPretty from 'react-json-pretty';
@@ -38,19 +38,34 @@ const JsonCardView: React.FC<JsonCardViewProps> = ({
     typeof data === 'object' ? Object.keys(data).length > 0 : true
   );
 
+  const processedData = useMemo(() => {
+    if (typeof data !== 'object' || data === null) {
+      return data;
+    }
+    
+    try {
+      return data;
+    } catch (error) {
+      console.error('JSON处理错误:', error);
+      return '数据格式化错误';
+    }
+  }, [data]);
+
   return (
     <Card 
       size="small" 
       title={title}
       style={style}
       extra={renderCardExtra()}
+      className="json-card-view"
     >
       {hasData ? (
         <div className="json-viewer">
           <JSONPretty 
             id={`json-pretty-${title.replace(/\s+/g, '-').toLowerCase()}`}
-            data={data}
+            data={processedData}
             theme={jsonPrettyTheme}
+            mainStyle="padding: 1em; line-height: 1.3;"
           />
         </div>
       ) : (
