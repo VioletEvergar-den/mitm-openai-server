@@ -1,0 +1,19 @@
+.latency-badge {
+  margin-left: 8px;
+}
+
+/* 响应状态码颜色 */
+.status-2xx {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.status-3xx {
+  color: #fd7e14;
+  font-weight: bold;
+}
+
+.status-4xx, .status-5xx {
+  color: #dc3545;
+  font-weight: bold;
+} 
