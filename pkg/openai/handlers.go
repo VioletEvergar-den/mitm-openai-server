@@ -1,0 +1,188 @@
+package openai
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/llm-sec/mitm-openai-server/pkg/storage"
+)
+
+// Handler 处理OpenAI API请求的处理器
+type Handler struct {
+	storage       storage.Storage
+	openaiService Service
+}
+
+// NewHandler 创建一个新的OpenAI处理器
+func NewHandler(storage storage.Storage, openaiService Service) *Handler {
+	return &Handler{
+		storage:       storage,
+		openaiService: openaiService,
+	}
+}
+
+// SetupRoutes 设置OpenAI API代理路由
+// 配置所有与OpenAI API相关的路由
+func (h *Handler) SetupRoutes(router *gin.Engine, apiMiddleware gin.HandlerFunc) {
+	// 如果没有初始化openaiService，跳过设置OpenAI路由
+	if h.openaiService == nil {
+		fmt.Println("警告: openaiService未初始化，跳过OpenAI路由设置")
+		return
+	}
+
+	// 添加OpenAI API规范路由 - 这个路由只添加一次
+	router.GET("/openai.json", h.openaiService.ServeOpenAISpec)
+
+	// OpenAI API路由组
+	openaiGroup := router.Group("/v1")
+
+	// 应用API中间件记录请求
+	openaiGroup.Use(apiMiddleware)
+
+	// 使用更宽松的CORS设置，确保跨域请求能正常工作
+	openaiGroup.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, Authorization")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	})
+
+	// 注册所有需要的OpenAI API路径
+	openaiGroup.POST("/chat/completions", h.HandleRequest)
+	openaiGroup.POST("/completions", h.HandleRequest)
+	openaiGroup.POST("/embeddings", h.HandleRequest)
+	openaiGroup.GET("/models", h.HandleRequest)
+
+	// 以下是更多可能需要的OpenAI API路径
+	openaiGroup.GET("/models/:model", h.HandleRequest)
+	openaiGroup.POST("/images/generations", h.HandleRequest)
+	openaiGroup.POST("/audio/transcriptions", h.HandleRequest)
+	openaiGroup.POST("/audio/translations", h.HandleRequest)
+	openaiGroup.POST("/fine-tuning/jobs", h.HandleRequest)
+	openaiGroup.GET("/fine-tuning/jobs", h.HandleRequest)
+	openaiGroup.GET("/fine-tuning/jobs/:job_id", h.HandleRequest)
+}
+
+// HandleRequest 处理OpenAI API请求
+// 根据配置，将请求代理到真实API或返回模拟响应
+// 参数:
+//   - c: Gin上下文
+func (h *Handler) HandleRequest(c *gin.Context) {
+	// 获取请求方法和路径
+	method := c.Request.Method
+	path := c.Param("path")
+
+	// 读取请求体
+	var bodyBytes []byte
+	var err error
+	if c.Request.Body != nil {
+		bodyBytes, err = io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": map[string]interface{}{
+					"message": "无法读取请求体: " + err.Error(),
+					"type":    "server_error",
+					"code":    "internal_server_error",
+				},
+			})
+			return
+		}
+		// 恢复请求体，以便其他中间件可以再次读取
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	}
+
+	// 收集请求头
+	headers := make(map[string]string)
+	for key, values := range c.Request.Header {
+		if len(values) > 0 {
+			headers[key] = values[0]
+		}
+	}
+
+	// 收集查询参数
+	queryParams := make(map[string]string)
+	for key, values := range c.Request.URL.Query() {
+		if len(values) > 0 {
+			queryParams[key] = values[0]
+		}
+	}
+
+	// 使用OpenAI服务处理请求
+	statusCode, responseHeaders, responseBody, err := h.openaiService.HandleRequest(
+		method, path, headers, queryParams, bodyBytes,
+	)
+
+	if err != nil {
+		// 发生错误，返回错误响应
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": map[string]interface{}{
+				"message": "处理请求失败: " + err.Error(),
+				"type":    "server_error",
+				"code":    "internal_server_error",
+			},
+		})
+		return
+	}
+
+	// 设置响应头
+	for key, value := range responseHeaders {
+		c.Header(key, value)
+	}
+
+	// 返回响应
+	c.JSON(statusCode, responseBody)
+
+	// 保存请求和响应记录
+	requestID := uuid.New().String()
+	clientIP := c.ClientIP()
+	latency := int64(0) // 这里可以计算实际延迟
+
+	// 创建响应对象
+	response := &storage.ProxyResponse{
+		StatusCode: statusCode,
+		Headers:    responseHeaders,
+		Body:       responseBody,
+		Latency:    latency,
+	}
+
+	// 创建请求记录
+	request := &storage.Request{
+		ID:        requestID,
+		Method:    method,
+		Path:      path,
+		Timestamp: time.Now(),
+		Headers:   headers,
+		Query:     queryParams,
+		Body:      bodyBytes,
+		ClientIP:  clientIP,
+		Response:  response,
+		Metadata: map[string]interface{}{
+			"latency_ms": latency,
+		},
+	}
+
+	// 保存请求
+	h.SaveRequest(request)
+}
+
+// SaveRequest 保存请求记录到存储
+// 这是一个公开的方法，允许外部代码保存请求数据
+// 参数:
+//   - request: 要保存的请求记录
+func (h *Handler) SaveRequest(request *storage.Request) error {
+	if h.storage == nil {
+		return fmt.Errorf("存储未初始化")
+	}
+	return h.storage.SaveRequest(request)
+}
