@@ -3,6 +3,8 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -121,11 +123,15 @@ func (s *UIServer) GetServerInfo(c *gin.Context) {
 
 // GetProxyConfig 获取代理配置
 func (s *UIServer) GetProxyConfig(c *gin.Context) {
+	// 从配置中获取存储路径
+	storagePath := getStoragePathConfig()
+
 	// 构建代理配置响应
 	config := map[string]interface{}{
-		"enabled":   s.config.ProxyMode,
-		"targetURL": s.config.TargetURL,
-		"authType":  s.config.TargetAuthType,
+		"enabled":     s.config.ProxyMode,
+		"targetURL":   s.config.TargetURL,
+		"authType":    s.config.TargetAuthType,
+		"storagePath": storagePath,
 	}
 
 	// 根据认证类型添加相应字段
@@ -158,12 +164,13 @@ func (s *UIServer) GetProxyConfig(c *gin.Context) {
 // SaveProxyConfig 保存代理配置
 func (s *UIServer) SaveProxyConfig(c *gin.Context) {
 	var config struct {
-		Enabled   bool   `json:"enabled"`
-		TargetURL string `json:"targetURL"`
-		AuthType  string `json:"authType"`
-		Username  string `json:"username,omitempty"`
-		Password  string `json:"password,omitempty"`
-		Token     string `json:"token,omitempty"`
+		Enabled     bool   `json:"enabled"`
+		TargetURL   string `json:"targetURL"`
+		AuthType    string `json:"authType"`
+		Username    string `json:"username,omitempty"`
+		Password    string `json:"password,omitempty"`
+		Token       string `json:"token,omitempty"`
+		StoragePath string `json:"storagePath,omitempty"`
 	}
 
 	if err := c.ShouldBindJSON(&config); err != nil {
@@ -172,6 +179,17 @@ func (s *UIServer) SaveProxyConfig(c *gin.Context) {
 			Msg:  "无效的请求格式",
 		})
 		return
+	}
+
+	// 保存存储路径配置
+	if config.StoragePath != "" {
+		if err := saveStoragePathConfig(config.StoragePath); err != nil {
+			c.JSON(http.StatusInternalServerError, StandardResponse{
+				Code: 10003,
+				Msg:  "保存存储路径失败: " + err.Error(),
+			})
+			return
+		}
 	}
 
 	// 返回成功响应
@@ -236,4 +254,49 @@ func (s *UIServer) HandleUIChat(c *gin.Context) {
 
 	// 返回OpenAI的原始响应
 	c.JSON(statusCode, responseBody)
+}
+
+// 简单地从固定位置读取存储路径配置
+func getStoragePathConfig() string {
+	// 获取用户主目录
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	// 配置文件路径
+	configDir := filepath.Join(homeDir, ".mitm-openai-server")
+	configFile := filepath.Join(configDir, "storage_path.txt")
+
+	// 读取配置文件
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return ""
+	}
+
+	return string(data)
+}
+
+// 保存存储路径配置到固定位置
+func saveStoragePathConfig(path string) error {
+	// 获取用户主目录
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("无法获取用户主目录: %v", err)
+	}
+
+	// 配置文件路径
+	configDir := filepath.Join(homeDir, ".mitm-openai-server")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("无法创建配置目录: %v", err)
+	}
+
+	configFile := filepath.Join(configDir, "storage_path.txt")
+
+	// 保存配置
+	if err := os.WriteFile(configFile, []byte(path), 0644); err != nil {
+		return fmt.Errorf("保存配置失败: %v", err)
+	}
+
+	return nil
 }
