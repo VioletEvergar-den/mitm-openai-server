@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -46,10 +47,19 @@ func (h *Handler) SetupRoutes(router *gin.Engine, apiMiddleware gin.HandlerFunc)
 
 	// 使用更宽松的CORS设置，确保跨域请求能正常工作
 	openaiGroup.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		origin := c.Request.Header.Get("Origin")
+		if origin == "" {
+			// 如果没有Origin头，允许所有源
+			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		} else {
+			// 有Origin头，设置为请求的源
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, Authorization, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Max-Age", "86400") // 24小时
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -81,7 +91,16 @@ func (h *Handler) SetupRoutes(router *gin.Engine, apiMiddleware gin.HandlerFunc)
 func (h *Handler) HandleRequest(c *gin.Context) {
 	// 获取请求方法和路径
 	method := c.Request.Method
-	path := c.Param("path")
+	path := c.Request.URL.Path
+
+	fmt.Printf("DEBUG: 原始路径: %s\n", path)
+
+	// 处理路径，移除前缀"/v1"
+	if strings.HasPrefix(path, "/v1") {
+		path = path[3:]
+	}
+
+	fmt.Printf("DEBUG: 处理后路径: %s\n", path)
 
 	// 读取请求体
 	var bodyBytes []byte
