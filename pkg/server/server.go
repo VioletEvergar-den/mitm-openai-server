@@ -59,11 +59,6 @@ func NewServerWithConfig(config api.ServerConfig) *Server {
 		log.Fatal("必须提供存储实例")
 	}
 
-	// 如果生成UI认证且没有设置密码，则生成随机密码
-	if config.GenerateUIAuth && config.UIPassword == "" {
-		config.UIPassword = utils.GenerateRandomPassword(12)
-	}
-
 	// 创建配置管理器
 	configManager, err := NewConfigManager()
 	if err != nil {
@@ -90,6 +85,27 @@ func NewServerWithConfig(config api.ServerConfig) *Server {
 			// 应用用户配置
 			configManager.ApplyConfig(userConfig, server)
 		}
+	}
+
+	// 如果启用了生成UI认证并且没有设置密码，检查是否有保存的密码，否则生成一个新的随机密码
+	if config.GenerateUIAuth && config.UIPassword == "" && server.config.UIPassword == "" {
+		// 如果密码为空，生成一个新的随机密码
+		newPassword := utils.GenerateRandomPassword(12)
+		server.config.UIPassword = newPassword
+
+		// 尝试保存新生成的密码到配置文件
+		if configManager != nil {
+			username := server.config.UIUsername // 通常是"root"
+			if err := configManager.SaveUICredentials(username, newPassword); err != nil {
+				fmt.Printf("警告: 无法保存UI凭据到配置文件: %v\n", err)
+			} else {
+				fmt.Printf("信息: UI凭据已保存到配置文件\n")
+			}
+		}
+	} else if server.config.UIPassword != "" {
+		// 使用已有密码，确保GenerateUIAuth设置为false，避免日志显示错误信息
+		server.config.GenerateUIAuth = false
+		fmt.Printf("信息: 使用配置文件中的UI密码\n")
 	}
 
 	// 初始化OpenAI服务
