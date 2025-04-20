@@ -2,6 +2,7 @@ package openai
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/llm-sec/mitm-openai-server/pkg/storage"
+	"github.com/llm-sec/mitm-openai-server/pkg/utils"
 )
 
 // Handler 处理OpenAI API请求的处理器
@@ -138,21 +140,57 @@ func (h *Handler) HandleRequest(c *gin.Context) {
 	}
 
 	// 使用OpenAI服务处理请求
-	statusCode, responseHeaders, responseBody, err := h.openaiService.HandleRequest(
+	startTime := time.Now()
+	statusCode, responseHeaders, responseData, err := h.openaiService.HandleRequest(
 		method, path, headers, queryParams, bodyBytes,
 	)
-
 	if err != nil {
-		// 发生错误，返回错误响应
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": map[string]interface{}{
-				"message": "处理请求失败: " + err.Error(),
-				"type":    "server_error",
-				"code":    "internal_server_error",
-			},
+			"error": fmt.Sprintf("处理请求失败: %v", err),
 		})
 		return
 	}
+
+	// 处理响应数据
+	var responseBody interface{}
+	if respBodyBytes, ok := responseData.([]byte); ok {
+		// 如果是字节数组，尝试解析JSON
+		if err := json.Unmarshal(respBodyBytes, &responseBody); err != nil {
+			// 解析失败则作为字符串处理
+			responseBody = string(respBodyBytes)
+		}
+	} else {
+		// 否则直接使用
+		responseBody = responseData
+	}
+
+	// 构建响应对象
+	response := &storage.ProxyResponse{
+		StatusCode: statusCode,
+		Headers:    responseHeaders,
+		Body:       responseBody,
+		Latency:    time.Since(startTime).Milliseconds(),
+	}
+
+	// 保存请求和响应
+	request := &storage.Request{
+		ID:        uuid.New().String(),
+		Method:    method,
+		Path:      path,
+		Timestamp: time.Now(),
+		Headers:   headers,
+		Query:     queryParams,
+		Body:      bodyBytes,
+		ClientIP:  utils.GetClientIP(c.Request),
+		Response:  response,
+		Metadata: map[string]interface{}{
+			"source":     "openai_handler",
+			"latency_ms": time.Since(startTime).Milliseconds(),
+		},
+	}
+
+	// 保存请求
+	h.SaveRequest(request)
 
 	// 设置响应头
 	for key, value := range responseHeaders {
@@ -161,38 +199,6 @@ func (h *Handler) HandleRequest(c *gin.Context) {
 
 	// 返回响应
 	c.JSON(statusCode, responseBody)
-
-	// 保存请求和响应记录
-	requestID := uuid.New().String()
-	clientIP := c.ClientIP()
-	latency := int64(0) // 这里可以计算实际延迟
-
-	// 创建响应对象
-	response := &storage.ProxyResponse{
-		StatusCode: statusCode,
-		Headers:    responseHeaders,
-		Body:       responseBody,
-		Latency:    latency,
-	}
-
-	// 创建请求记录
-	request := &storage.Request{
-		ID:        requestID,
-		Method:    method,
-		Path:      path,
-		Timestamp: time.Now(),
-		Headers:   headers,
-		Query:     queryParams,
-		Body:      bodyBytes,
-		ClientIP:  clientIP,
-		Response:  response,
-		Metadata: map[string]interface{}{
-			"latency_ms": latency,
-		},
-	}
-
-	// 保存请求
-	h.SaveRequest(request)
 }
 
 // SaveRequest 保存请求记录到存储
