@@ -2,7 +2,6 @@ package utils
 
 import (
 	"encoding/base64"
-	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -82,9 +81,6 @@ func GenerateRandomPassword(length int) string {
 	for i := 0; i < length; i++ {
 		password[i] = charset[rand.Intn(len(charset))]
 	}
-
-	// 打印用于调试的信息
-	fmt.Printf("生成随机密码: %s (长度: %d) [种子: %d]\n", string(password), length, seed)
 
 	return string(password)
 }
