@@ -52,8 +52,12 @@ var serverCmd = &cobra.Command{
   # 启动独立模式服务器（返回模拟数据）
   mitm-openai-server server --port 8080 --data ./data
   
-  # 带认证的独立模式
-  mitm-openai-server server --enable-auth --auth-type basic --auth-username admin --auth-password secret
+  # API认证默认开启，使用basic认证方式和--auth-username/--auth-password参数提供的凭据
+  # 而UI认证使用login.json中存储的凭据（默认用户名root，初次运行自动生成密码）
+  # 如需禁用API认证，请使用 --enable-auth=false
+  
+  # 独立模式（默认带认证）
+  mitm-openai-server server --auth-username admin --auth-password secret
   
   # 代理模式（转发到真实API）
   mitm-openai-server server --proxy-mode --target-url https://api.example.com
@@ -70,7 +74,7 @@ func init() {
 
 	// API服务器特定的标志
 	serverCmd.Flags().IntVar(&port, "port", 8080, "服务器监听端口")
-	serverCmd.Flags().BoolVar(&enableAuth, "enable-auth", false, "启用API认证")
+	serverCmd.Flags().BoolVar(&enableAuth, "enable-auth", true, "启用API认证")
 	serverCmd.Flags().StringVar(&authType, "auth-type", "basic", "认证类型 (basic 或 token)")
 	serverCmd.Flags().StringVar(&authUsername, "auth-username", "admin", "API Basic认证用户名")
 	serverCmd.Flags().StringVar(&authPassword, "auth-password", "", "API Basic认证密码")
