@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -59,7 +60,7 @@ func (fs *FileSystemStorage) SaveRequest(req *Request) error {
 	}
 
 	// 确保Timestamp字段有值
-	if req.Timestamp == nil {
+	if req.Timestamp.IsZero() {
 		req.Timestamp = time.Now()
 	}
 
@@ -149,19 +150,38 @@ func (fs *FileSystemStorage) GetAllRequests(limit int, offset int) ([]*Request, 
 
 	// 读取并解析每个请求文件
 	var requests []*Request
+	var parseErrors []string
 	for _, fileName := range pagedFiles {
 		filePath := filepath.Join(fs.dataFolder, fileName)
 		data, err := os.ReadFile(filePath)
 		if err != nil {
-			return nil, fmt.Errorf("读取请求文件失败: %w", err)
+			// 记录错误但继续处理
+			parseErrors = append(parseErrors, fmt.Sprintf("读取请求文件失败(%s): %v", fileName, err))
+			continue
 		}
 
 		var req Request
 		if err := json.Unmarshal(data, &req); err != nil {
-			return nil, fmt.Errorf("解析请求数据失败: %w", err)
+			// 记录错误但继续处理
+			parseErrors = append(parseErrors, fmt.Sprintf("解析请求数据失败(%s): %v", fileName, err))
+			continue
 		}
 
 		requests = append(requests, &req)
+	}
+
+	// 如果有解析错误，但我们还是获取到了一些请求，记录错误但返回可用的请求
+	if len(parseErrors) > 0 && len(requests) > 0 {
+		log.Printf("GetAllRequests 警告: 有 %d 个解析错误，但成功获取了 %d 个请求", len(parseErrors), len(requests))
+		for _, errMsg := range parseErrors {
+			log.Printf("解析错误: %s", errMsg)
+		}
+		return requests, nil
+	}
+
+	// 如果只有错误但没有请求，返回错误
+	if len(parseErrors) > 0 && len(requests) == 0 {
+		return nil, fmt.Errorf("解析请求数据失败，所有记录均无法解析: %s", strings.Join(parseErrors, "; "))
 	}
 
 	return requests, nil
