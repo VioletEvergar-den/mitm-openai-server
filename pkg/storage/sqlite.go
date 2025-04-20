@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -186,7 +188,8 @@ func (s *SQLiteStorage) GetRequestByID(id string) (*Request, error) {
 	// 解析时间戳
 	timestamp, err := time.Parse(time.RFC3339, timestampStr)
 	if err != nil {
-		req.Timestamp = timestampStr
+		// 如果无法解析，设置为当前时间
+		req.Timestamp = time.Now()
 	} else {
 		req.Timestamp = timestamp
 	}
@@ -234,6 +237,7 @@ func (s *SQLiteStorage) GetAllRequests(limit int, offset int) ([]*Request, error
 	defer rows.Close()
 
 	var requests []*Request
+	var parseErrors []string
 	for rows.Next() {
 		var (
 			req          Request
@@ -257,7 +261,9 @@ func (s *SQLiteStorage) GetAllRequests(limit int, offset int) ([]*Request, error
 			&responseJSON,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("扫描请求行失败: %w", err)
+			// 记录错误但继续处理
+			parseErrors = append(parseErrors, fmt.Sprintf("扫描请求行失败(ID可能未知): %v", err))
+			continue
 		}
 
 		// 设置IP地址字段
@@ -267,39 +273,62 @@ func (s *SQLiteStorage) GetAllRequests(limit int, offset int) ([]*Request, error
 		// 解析时间戳
 		timestamp, err := time.Parse(time.RFC3339, timestampStr)
 		if err != nil {
-			req.Timestamp = timestampStr
+			// 如果无法解析，设置为当前时间
+			req.Timestamp = time.Now()
 		} else {
 			req.Timestamp = timestamp
 		}
 
-		// 解析JSON字段
+		// 解析JSON字段，出错时继续处理
+		var validRequest = true
+
 		if err := json.Unmarshal([]byte(headersJSON), &req.Headers); err != nil {
-			return nil, fmt.Errorf("解析请求头JSON失败: %w", err)
+			parseErrors = append(parseErrors, fmt.Sprintf("解析请求头JSON失败(ID:%s): %v", req.ID, err))
+			validRequest = false
 		}
 
 		if err := json.Unmarshal([]byte(queryJSON), &req.Query); err != nil {
-			return nil, fmt.Errorf("解析查询参数JSON失败: %w", err)
+			parseErrors = append(parseErrors, fmt.Sprintf("解析查询参数JSON失败(ID:%s): %v", req.ID, err))
+			validRequest = false
 		}
 
 		if bodyJSON.Valid && bodyJSON.String != "" {
 			if err := json.Unmarshal([]byte(bodyJSON.String), &req.Body); err != nil {
-				return nil, fmt.Errorf("解析请求体JSON失败: %w", err)
+				parseErrors = append(parseErrors, fmt.Sprintf("解析请求体JSON失败(ID:%s): %v", req.ID, err))
+				validRequest = false
 			}
 		}
 
 		if responseJSON.Valid && responseJSON.String != "" {
 			var resp ProxyResponse
 			if err := json.Unmarshal([]byte(responseJSON.String), &resp); err != nil {
-				return nil, fmt.Errorf("解析响应JSON失败: %w", err)
+				parseErrors = append(parseErrors, fmt.Sprintf("解析响应JSON失败(ID:%s): %v", req.ID, err))
+				validRequest = false
 			}
 			req.Response = &resp
 		}
 
-		requests = append(requests, &req)
+		if validRequest {
+			requests = append(requests, &req)
+		}
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("迭代请求行时出错: %w", err)
+		parseErrors = append(parseErrors, fmt.Sprintf("迭代请求行时出错: %v", err))
+	}
+
+	// 如果有解析错误，但我们还是获取到了一些请求，记录错误但返回可用的请求
+	if len(parseErrors) > 0 && len(requests) > 0 {
+		log.Printf("GetAllRequests 警告: 有 %d 个解析错误，但成功获取了 %d 个请求", len(parseErrors), len(requests))
+		for _, errMsg := range parseErrors {
+			log.Printf("解析错误: %s", errMsg)
+		}
+		return requests, nil
+	}
+
+	// 如果只有错误但没有请求，返回错误
+	if len(parseErrors) > 0 && len(requests) == 0 {
+		return nil, fmt.Errorf("解析请求数据失败，所有记录均无法解析: %s", strings.Join(parseErrors, "; "))
 	}
 
 	return requests, nil
