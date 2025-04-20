@@ -3,6 +3,8 @@ package api
 import (
 	"net/http"
 
+	"log"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,7 +17,38 @@ func (s *UIServer) GetRequests(c *gin.Context) {
 
 	// 从存储中获取请求列表
 	requests, err := s.storage.GetAllRequests(limit, offset)
+
+	// 获取总请求数 - 尝试从统计信息中获取，避免依赖请求列表
+	var total int64 = 0
+	stats, statsErr := s.storage.GetStats()
+	if statsErr == nil && stats["total_requests"] != nil {
+		if totalInt, ok := stats["total_requests"].(int); ok {
+			total = int64(totalInt)
+		}
+	}
+
+	// 如果获取请求列表失败
 	if err != nil {
+		// 记录错误
+		log.Printf("获取请求列表失败: %v", err)
+
+		// 如果有统计信息，至少返回分页信息，而不是请求列表
+		if total > 0 {
+			c.JSON(http.StatusOK, StandardResponse{
+				Code: 10013,
+				Msg:  "获取请求列表部分失败，但成功获取了统计信息: " + err.Error(),
+				Data: map[string]interface{}{
+					"requests": []*Request{}, // 空列表
+					"total":    total,
+					"page":     page,
+					"size":     size,
+					"error":    err.Error(),
+				},
+			})
+			return
+		}
+
+		// 如果连统计信息都没有，则返回500错误
 		c.JSON(http.StatusInternalServerError, StandardResponse{
 			Code: 10012,
 			Msg:  "获取请求列表失败: " + err.Error(),
@@ -23,9 +56,10 @@ func (s *UIServer) GetRequests(c *gin.Context) {
 		return
 	}
 
-	// 获取总请求数
-	var total int64
-	total = int64(len(requests))
+	// 如果还没有设置总请求数，从请求列表的长度计算
+	if total == 0 {
+		total = int64(len(requests))
+	}
 
 	// 将存储请求转换为服务器请求
 	serverRequests := make([]*Request, len(requests))
