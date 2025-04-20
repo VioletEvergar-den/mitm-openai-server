@@ -41,25 +41,52 @@ type ServerConfig struct {
 // 这样可以在 api 包中使用 openai 包的接口定义
 type OpenAIServiceInterface = openai.Service
 
-// UIServerInterface 定义与UI服务交互的接口
+// UIServerInterface 定义了UI服务器的接口
 type UIServerInterface interface {
-	// SetupUIRoutes 配置UI相关路由
+	// SetupUIRoutes 设置UI相关的路由
 	SetupUIRoutes(router *gin.Engine, authMiddleware gin.HandlerFunc, apiMiddleware gin.HandlerFunc)
 
-	// 请求管理
-	GetRequests(c *gin.Context)
+	// HandleUILogin 处理UI登录请求
+	HandleUILogin(c *gin.Context)
+
+	// GetServerInfo 返回服务器信息
+	GetServerInfo(c *gin.Context)
+
+	// GetProxyConfig 获取代理配置
+	GetProxyConfig(c *gin.Context)
+
+	// SaveProxyConfig 保存代理配置
+	SaveProxyConfig(c *gin.Context)
+
+	// GetRequestByID 获取特定ID的请求
 	GetRequestByID(c *gin.Context)
+
+	// GetRequests 获取请求列表
+	GetRequests(c *gin.Context)
+
+	// DeleteRequest 删除特定ID的请求
 	DeleteRequest(c *gin.Context)
+
+	// DeleteAllRequests 删除所有请求
 	DeleteAllRequests(c *gin.Context)
+
+	// ExportRequests 导出请求
 	ExportRequests(c *gin.Context)
+
+	// GetStorageStats 获取存储统计信息
 	GetStorageStats(c *gin.Context)
 
-	// UI接口
-	HandleUILogin(c *gin.Context)
-	GetServerInfo(c *gin.Context)
-	GetProxyConfig(c *gin.Context)
-	SaveProxyConfig(c *gin.Context)
+	// GetAPIToken 获取API Token
+	GetAPIToken(c *gin.Context)
+
+	// HandleUIChat 处理聊天请求
 	HandleUIChat(c *gin.Context)
+
+	// SetConfig 设置或更新服务器配置
+	SetConfig(config ServerConfig)
+
+	// ValidateToken 验证令牌是否有效
+	ValidateToken(token string) bool
 }
 
 // ConfigManagerInterface 定义配置管理接口
