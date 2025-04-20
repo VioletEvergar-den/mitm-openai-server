@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -84,28 +85,51 @@ func NewServerWithConfig(config api.ServerConfig) *Server {
 		} else {
 			// 应用用户配置
 			configManager.ApplyConfig(userConfig, server)
+
+			// 如果成功加载了密码，跳过自动生成
+			if userConfig.UIPassword != "" {
+				config.GenerateUIAuth = false
+			}
 		}
 	}
 
-	// 如果启用了生成UI认证并且没有设置密码，检查是否有保存的密码，否则生成一个新的随机密码
-	if config.GenerateUIAuth && config.UIPassword == "" && server.config.UIPassword == "" {
-		// 如果密码为空，生成一个新的随机密码
+	// 密码处理逻辑 - 简化，避免无限循环
+	if server.configManager != nil && server.config.UIPassword == "" && config.GenerateUIAuth {
+		// 只有在密码为空且启用了生成功能时才生成
+		username := server.config.UIUsername
+		if username == "" {
+			username = "root" // 默认用户名
+			server.config.UIUsername = username
+		}
+
+		// 生成随机密码
 		newPassword := utils.GenerateRandomPassword(12)
 		server.config.UIPassword = newPassword
 
-		// 尝试保存新生成的密码到配置文件
-		if configManager != nil {
-			username := server.config.UIUsername // 通常是"root"
-			if err := configManager.SaveUICredentials(username, newPassword); err != nil {
-				fmt.Printf("警告: 无法保存UI凭据到配置文件: %v\n", err)
+		fmt.Printf("\n首次启动 - 已生成密码 (密码已保存到login.json文件)\n")
+
+		// 创建login.json文件
+		loginConfig := struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		}{
+			Username: username,
+			Password: newPassword,
+		}
+
+		// 序列化为JSON
+		data, err := json.MarshalIndent(loginConfig, "", "  ")
+		if err == nil {
+			// 写入login.json文件
+			err = os.WriteFile("login.json", data, 0644)
+			if err != nil {
+				fmt.Printf("警告: 无法写入login.json文件: %v\n", err)
 			} else {
-				fmt.Printf("信息: UI凭据已保存到配置文件\n")
+				fmt.Printf("成功创建login.json文件\n")
 			}
 		}
 	} else if server.config.UIPassword != "" {
-		// 使用已有密码，确保GenerateUIAuth设置为false，避免日志显示错误信息
-		server.config.GenerateUIAuth = false
-		fmt.Printf("信息: 使用配置文件中的UI密码\n")
+		fmt.Printf("\n使用已有密码: •••••••• (长度: %d)\n", len(server.config.UIPassword))
 	}
 
 	// 初始化OpenAI服务
@@ -152,6 +176,14 @@ func NewServerWithConfig(config api.ServerConfig) *Server {
 	openaiHandler := openai.NewHandler(config.Storage, server.openaiService)
 	server.openaiHandler = openaiHandler
 
+	// 确保UI服务器使用最新密码
+	if uiServer, ok := server.uiServer.(*api.UIServer); ok {
+		if server.config.UIPassword != "" && len(server.config.UIPassword) > 0 {
+			fmt.Printf("确认传递给UI服务器的密码: •••••••• (长度: %d)\n", len(server.config.UIPassword))
+			uiServer.SetConfig(server.config)
+		}
+	}
+
 	// 设置路由
 	server.setupRoutes()
 	server.setupOpenAIRoutes() // 设置OpenAI相关路由
@@ -167,7 +199,67 @@ func NewServerWithConfig(config api.ServerConfig) *Server {
 // 返回:
 //   - error: 如果服务器启动失败，返回错误
 func (s *Server) Run(addr string) error {
+	// 不再调用ensurePassword方法，避免循环
+	// s.ensurePassword()
+
+	fmt.Println("\n┌─────────────────────────────────────────────────┐")
+	fmt.Println("│            MITM OpenAI Server 已启动            │")
+	fmt.Println("└─────────────────────────────────────────────────┘\n")
+
+	port := addr[1:] // 去掉":"
+	fmt.Printf("登录地址: http://localhost:%s/ui/login\n", port)
+	fmt.Printf("用户名:   %s\n", s.config.UIUsername)
+
+	// 混淆密码显示
+	if s.config.UIPassword != "" {
+		maskedPassword := "••••••••"
+		fmt.Printf("密码:     %s\n", maskedPassword)
+	} else {
+		fmt.Printf("密码:     [未设置]\n")
+	}
+
+	fmt.Println("\n请使用上述凭据登录系统，监控和分析OpenAI API请求。\n")
+
 	return s.router.Run(addr)
+}
+
+// ensurePassword 确保系统有有效的密码
+// 如果没有密码，则生成一个随机密码并保存
+func (s *Server) ensurePassword() {
+	// 如果已经有密码，则不需要再生成
+	if s.config.UIPassword != "" && len(s.config.UIPassword) > 0 {
+		fmt.Printf("已有密码: •••••••• (长度: %d)\n", len(s.config.UIPassword))
+		return
+	}
+
+	// 生成新密码（不再尝试从配置文件加载）
+	password := utils.GenerateRandomPassword(12)
+	s.config.UIPassword = password
+	fmt.Printf("已生成新密码 (长度: %d)\n", len(password))
+
+	// 如果配置管理器可用，保存密码
+	if s.configManager != nil {
+		// 直接保存密码到LoginFile
+		loginConfig := struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		}{
+			Username: s.config.UIUsername,
+			Password: password,
+		}
+
+		// 序列化为JSON
+		data, err := json.MarshalIndent(loginConfig, "", "  ")
+		if err == nil {
+			// 写入login.json文件
+			err = os.WriteFile("login.json", data, 0644)
+			if err != nil {
+				fmt.Printf("警告: 无法写入login.json文件: %v\n", err)
+			} else {
+				fmt.Printf("成功创建login.json文件，密码已保存\n")
+			}
+		}
+	}
 }
 
 // authMiddleware 认证中间件
@@ -249,7 +341,17 @@ func (s *Server) validateTokenAuth(c *gin.Context) bool {
 		token = authHeader[7:] // 去掉"Bearer "前缀
 	}
 
-	return token == s.config.Token
+	// 1. 检查配置中的令牌
+	if token == s.config.Token {
+		return true
+	}
+
+	// 2. 检查是否是UI登录生成的令牌
+	if s.uiServer != nil && s.uiServer.ValidateToken(token) {
+		return true
+	}
+
+	return false
 }
 
 // corsMiddleware CORS中间件
@@ -467,7 +569,7 @@ func (s *Server) apiMiddleware() gin.HandlerFunc {
 		// 创建响应对象
 		response := &storage.ProxyResponse{
 			StatusCode: statusCode,
-			Headers:    responseHeaders,
+			Headers:    utils.ConvertHeaderToStringMap(responseHeaders),
 			Body:       responseBody,
 			Latency:    latency,
 		}
@@ -478,8 +580,8 @@ func (s *Server) apiMiddleware() gin.HandlerFunc {
 			Method:    method,
 			Path:      path,
 			Timestamp: time.Now(),
-			Headers:   headers,
-			Query:     query,
+			Headers:   utils.ConvertToStringMap(headers),
+			Query:     utils.ConvertToStringMap(query),
 			Body:      bodyData,
 			ClientIP:  clientIP,
 			Response:  response,
@@ -502,4 +604,17 @@ func (s *Server) apiMiddleware() gin.HandlerFunc {
 //   - ServerConfig: 服务器配置
 func (s *Server) GetConfig() api.ServerConfig {
 	return s.config
+}
+
+// InitServer 初始化服务器并打印配置信息（不显示密码）
+// 参数:
+//   - cfg: 服务器配置
+//
+// 返回:
+//   - *Server: 初始化后的服务器
+//   - error: 初始化过程中的错误
+func InitServer(cfg api.ServerConfig) (*Server, error) {
+	server := NewServerWithConfig(cfg)
+	fmt.Printf("UI服务器配置: 用户名=%s, 密码=••••••••\n", cfg.UIUsername)
+	return server, nil
 }

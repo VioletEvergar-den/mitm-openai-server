@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,8 @@ type UIServer struct {
 	storage       storage.Storage
 	config        ServerConfig
 	openaiService OpenAIServiceInterface
+	// 添加令牌验证存储
+	tokenStore sync.Map
 }
 
 // NewUIServer 创建一个新的UI服务器实例
@@ -37,12 +40,47 @@ func (s *UIServer) SetupUIRoutes(router *gin.Engine, authMiddleware gin.HandlerF
 		uiPath = "./ui" // 默认UI目录
 	}
 
-	// UI API路由组 - 需要认证
+	// UI认证中间件
+	uiAuthMiddleware := func(c *gin.Context) {
+		// 检查Authorization头
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, StandardResponse{
+				Code: 10002,
+				Msg:  "认证失败",
+			})
+			c.Abort()
+			return
+		}
+
+		// 支持"Bearer token"格式和直接的令牌格式
+		token := authHeader
+		if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
+			token = authHeader[7:] // 去掉"Bearer "前缀
+		}
+
+		// 验证令牌
+		_, found := s.tokenStore.Load(token)
+		if !found {
+			c.JSON(http.StatusUnauthorized, StandardResponse{
+				Code: 10002,
+				Msg:  "认证失败",
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+
+	// UI API路由组 - 需要UI认证
 	uiAPI := router.Group("/ui/api")
-	uiAPI.Use(authMiddleware)
 
 	// UI 登录接口 - 登录接口不需要认证
-	router.POST("/ui/api/login", s.HandleUILogin)
+	uiAPI.POST("/login", s.HandleUILogin)
+
+	// 添加UI认证中间件
+	uiAPI.Use(uiAuthMiddleware)
 
 	// 请求相关接口
 	uiAPI.GET("/requests", s.GetRequests)
@@ -93,16 +131,69 @@ func (s *UIServer) HandleUILogin(c *gin.Context) {
 	configUsername := strings.TrimSpace(s.config.UIUsername)
 	configPassword := strings.TrimSpace(s.config.UIPassword)
 
-	// 打印调试信息
-	fmt.Printf("\n登录请求: 用户名=%s, 密码=%s\n", loginReq.Username, loginReq.Password)
-	fmt.Printf("配置中的: 用户名=%s, 密码=%s\n", configUsername, configPassword)
-	fmt.Printf("原始数据: 接收密码长度=%d, 配置密码长度=%d\n", len(loginReq.Password), len(configPassword))
+	// 添加更详细的调试信息
+	fmt.Printf("\n=================== 登录请求详细信息 ===================\n")
+	fmt.Printf("用户名: %s\n", loginReq.Username)
+	fmt.Printf("收到的密码: %s (长度:%d)\n", loginReq.Password, len(loginReq.Password))
+	fmt.Printf("配置中的密码: %s (长度:%d)\n", configPassword, len(configPassword))
+
+	if len(loginReq.Password) > 0 && len(configPassword) > 0 {
+		fmt.Printf("\n密码字符比较:\n")
+		if loginReq.Password != configPassword {
+			// 详细比较密码差异
+			if len(loginReq.Password) > len(configPassword) {
+				fmt.Printf("收到的密码多余字符:\n")
+				for i := 0; i < len(loginReq.Password); i++ {
+					if i < len(configPassword) {
+						if loginReq.Password[i] != configPassword[i] {
+							fmt.Printf("位置 %d: '%c'(ASCII:%d) vs '%c'(ASCII:%d)\n",
+								i, loginReq.Password[i], loginReq.Password[i],
+								configPassword[i], configPassword[i])
+						}
+					} else {
+						fmt.Printf("位置 %d: '%c'(ASCII:%d)\n",
+							i, loginReq.Password[i], loginReq.Password[i])
+					}
+				}
+			} else if len(configPassword) > len(loginReq.Password) {
+				fmt.Printf("配置密码多余字符:\n")
+				for i := 0; i < len(configPassword); i++ {
+					if i < len(loginReq.Password) {
+						if loginReq.Password[i] != configPassword[i] {
+							fmt.Printf("位置 %d: '%c'(ASCII:%d) vs '%c'(ASCII:%d)\n",
+								i, loginReq.Password[i], loginReq.Password[i],
+								configPassword[i], configPassword[i])
+						}
+					} else {
+						fmt.Printf("位置 %d: '%c'(ASCII:%d)\n",
+							i, configPassword[i], configPassword[i])
+					}
+				}
+			} else {
+				fmt.Printf("密码长度相同但内容不同:\n")
+				for i := 0; i < len(loginReq.Password); i++ {
+					if loginReq.Password[i] != configPassword[i] {
+						fmt.Printf("位置 %d: '%c'(ASCII:%d) vs '%c'(ASCII:%d)\n",
+							i, loginReq.Password[i], loginReq.Password[i],
+							configPassword[i], configPassword[i])
+					}
+				}
+			}
+		} else {
+			fmt.Printf("密码完全匹配\n")
+		}
+	}
+
+	fmt.Printf("=================== 结束调试信息 ===================\n\n")
 
 	// 验证用户名和密码，只使用配置中的凭据
 	if loginReq.Username == configUsername && loginReq.Password == configPassword {
 		// 登录成功，生成令牌
 		token := fmt.Sprintf("%s_%d", uuid.New().String(), time.Now().Unix())
 		fmt.Println("登录成功!")
+
+		// 将令牌存储到内存中
+		s.tokenStore.Store(token, loginReq.Username)
 
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",
@@ -114,13 +205,18 @@ func (s *UIServer) HandleUILogin(c *gin.Context) {
 
 	// 登录失败
 	fmt.Println("登录失败: 用户名或密码不匹配")
-	fmt.Printf("请求: 用户=%s, 密码=%s\n", loginReq.Username, loginReq.Password)
-	fmt.Printf("配置: 用户=%s, 密码=%s\n", configUsername, configPassword)
 
 	c.JSON(http.StatusUnauthorized, gin.H{
 		"status":  "error",
 		"message": "用户名或密码错误",
 	})
+}
+
+// ValidateToken 验证令牌是否有效
+// 此方法供authMiddleware调用
+func (s *UIServer) ValidateToken(token string) bool {
+	_, found := s.tokenStore.Load(token)
+	return found
 }
 
 // GetServerInfo 返回服务器信息
@@ -340,4 +436,16 @@ func saveStoragePathConfig(path string) error {
 	}
 
 	return nil
+}
+
+// SetConfig 设置或更新服务器配置
+// 用于在服务器启动后更新UI配置
+func (s *UIServer) SetConfig(config ServerConfig) {
+	if config.UIUsername != "" {
+		s.config.UIUsername = config.UIUsername
+	}
+	if config.UIPassword != "" {
+		s.config.UIPassword = config.UIPassword
+		fmt.Printf("UI服务器密码已更新: %s (长度: %d)\n", s.config.UIPassword, len(s.config.UIPassword))
+	}
 }
