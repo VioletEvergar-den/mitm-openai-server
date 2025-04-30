@@ -128,23 +128,12 @@ func (cm *ConfigManager) loadFromLoginFile() (UserConfig, error) {
 	config.UIPassword = loginData.Password
 	config.FirstRun = false // 标记为非首次运行
 
-	// 打印安全的凭据信息 (不显示密码)
-	fmt.Printf("从login.json加载的凭据: 用户名=%s, 密码=•••••••• (长度: %d)\n",
-		config.UIUsername, len(config.UIPassword))
-
-	// 不要在这里调用SaveConfig以避免循环
-	// 如果需要将登录凭据同步到配置文件，应该由调用方处理
-
 	return config, nil
 }
 
-// ApplyConfig 将用户配置应用到服务器配置
+// ApplyConfig 将用户配置应用到服务器
+// 将UserConfig中的设置应用到服务器配置
 func (cm *ConfigManager) ApplyConfig(config UserConfig, server *Server) {
-	fmt.Printf("\n=================== 配置应用过程 ===================\n")
-	fmt.Printf("配置中的UI用户名: %s\n", config.UIUsername)
-	fmt.Printf("配置中的UI密码: •••••••• (长度: %d)\n", len(config.UIPassword))
-	fmt.Printf("服务器当前UI密码: •••••••• (长度: %d)\n", len(server.config.UIPassword))
-
 	// 应用代理设置
 	server.config.ProxyMode = config.ProxyMode
 	server.config.TargetURL = config.TargetURL
@@ -164,7 +153,6 @@ func (cm *ConfigManager) ApplyConfig(config UserConfig, server *Server) {
 	// 应用UI认证设置
 	if config.UIUsername != "" {
 		server.config.UIUsername = strings.TrimSpace(config.UIUsername)
-		fmt.Printf("应用了UI用户名: %s\n", server.config.UIUsername)
 	}
 
 	// 确保密码被正确处理和设置
@@ -173,7 +161,6 @@ func (cm *ConfigManager) ApplyConfig(config UserConfig, server *Server) {
 		server.config.UIPassword = strings.TrimSpace(config.UIPassword)
 		// 如果有保存的密码，禁用随机密码生成
 		server.config.GenerateUIAuth = false
-		fmt.Printf("应用了UI密码: •••••••• (长度: %d)\n", len(server.config.UIPassword))
 	}
 
 	// 应用存储路径设置
@@ -181,9 +168,6 @@ func (cm *ConfigManager) ApplyConfig(config UserConfig, server *Server) {
 		// 存储路径保存在配置中，实际应用在启动时处理
 		server.storagePath = config.StoragePath
 	}
-
-	fmt.Printf("应用后的服务器UI密码: •••••••• (长度: %d)\n", len(server.config.UIPassword))
-	fmt.Printf("=================== 配置应用结束 ===================\n\n")
 }
 
 // SaveConfig 将用户配置保存到文件
@@ -212,8 +196,6 @@ func (cm *ConfigManager) SaveConfig(config UserConfig) error {
 			// 写入文件
 			if err := os.WriteFile(cm.loginFile, data, 0644); err != nil {
 				fmt.Printf("警告: 无法写入登录文件: %v\n", err)
-			} else {
-				fmt.Printf("成功创建登录文件，用户名=%s\n", config.UIUsername)
 			}
 		}
 
@@ -305,8 +287,6 @@ func (cm *ConfigManager) updateLoginFile() error {
 	if err := os.WriteFile(cm.loginFile, data, 0644); err != nil {
 		return fmt.Errorf("写入登录文件失败: %v", err)
 	}
-
-	fmt.Printf("已创建初始登录文件模板: 用户名=%s (无密码)\n", loginConfig.Username)
 
 	return nil
 }

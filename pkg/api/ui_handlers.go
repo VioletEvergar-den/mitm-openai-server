@@ -446,6 +446,5 @@ func (s *UIServer) SetConfig(config ServerConfig) {
 	}
 	if config.UIPassword != "" {
 		s.config.UIPassword = config.UIPassword
-		fmt.Printf("UI服务器密码已更新: %s (长度: %d)\n", s.config.UIPassword, len(s.config.UIPassword))
 	}
 }

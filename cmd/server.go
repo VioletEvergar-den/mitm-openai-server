@@ -229,6 +229,7 @@ func runServer() {
 	// 获取UI配置
 	serverConfig := apiServer.GetConfig()
 
+	// 精简登录信息显示 - 已删除重复的框
 	fmt.Println()
 	fmt.Println(colorBold + colorCyan + "┌─────────────────────────────────────────────────┐" + colorReset)
 	fmt.Println(colorBold + colorCyan + "│            MITM OpenAI Server 已启动            │" + colorReset)
@@ -236,12 +237,22 @@ func runServer() {
 	fmt.Println()
 	fmt.Printf("%s登录地址:%s %shttp://localhost%s/ui/login%s\n", colorBold, colorReset, colorGreen, addr, colorReset)
 	fmt.Printf("%s用户名:%s   %s%s%s\n", colorBold, colorReset, colorPurple, serverConfig.UIUsername, colorReset)
-	fmt.Printf("%s密码:%s     %s%s%s\n", colorBold, colorReset, colorPurple, serverConfig.UIPassword, colorReset)
+
+	// 显示真实密码，帮助用户登录
+	if serverConfig.UIPassword != "" {
+		fmt.Printf("%s密码:%s     %s%s%s\n", colorBold, colorReset, colorPurple, serverConfig.UIPassword, colorReset)
+	} else {
+		fmt.Printf("%s密码:%s     %s[未设置]%s\n", colorBold, colorReset, colorRed, colorReset)
+	}
+
 	fmt.Println()
 	fmt.Println(colorBold + "请使用上述凭据登录系统，监控和分析OpenAI API请求。" + colorReset)
 	fmt.Println()
 
-	// 启动服务器
+	// 启动服务器 - 启动前修改服务器的Run方法，避免重复输出
+	// 设置标志禁止重复输出启动信息
+	apiServer.SuppressStartupInfo = true
+
 	if err := apiServer.Run(addr); err != nil {
 		log.Fatalf("启动服务器失败: %v", err)
 	}
