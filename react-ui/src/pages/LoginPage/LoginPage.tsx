@@ -11,7 +11,8 @@ import {
   Typography, 
   Alert, 
   Space, 
-  Layout
+  Layout,
+  Tooltip
 } from 'antd';
 import { 
   UserOutlined, 
@@ -19,12 +20,13 @@ import {
   EyeTwoTone, 
   EyeInvisibleOutlined, 
   LoginOutlined,
-  GithubOutlined
+  GithubOutlined,
+  SafetyOutlined
 } from '@ant-design/icons';
 import Footer from '../../components/Footer';
 import './LoginPage.css';
 
-const { Title, Paragraph, Link } = Typography;
+const { Title, Paragraph, Link, Text } = Typography;
 const { Content } = Layout;
 
 const LoginPage: React.FC = () => {
@@ -75,6 +77,15 @@ const LoginPage: React.FC = () => {
       
       const data = await response.json();
       
+      // 添加控制台调试输出
+      console.log('登录响应数据:', data);
+      console.log('登录响应状态:', response.status);
+      console.log('token是否存在:', !!data.token);
+      if (data.token) {
+        console.log('token长度:', data.token.length);
+        console.log('token前10个字符:', data.token.substring(0, 10));
+      }
+      
       if (response.ok && data.status === 'success') {
         // 登录成功
         
@@ -91,10 +102,16 @@ const LoginPage: React.FC = () => {
           localStorage.removeItem('mitm_remembered_password');
         }
         
-        // 保存登录状态和凭据，设置为一年有效期
-        utils.saveAuth(username, password, 365);
-        login(username, password);
-        navigate('/');
+        // 保存后端返回的token，设置为一年有效期
+        if (data.token) {
+          utils.saveAuth(data.token, 365);
+          login(username);
+          console.log('已保存token到localStorage');
+          console.log('保存的token:', localStorage.getItem('auth_token'));
+          navigate('/');
+        } else {
+          setError('服务器没有返回有效的认证令牌');
+        }
       } else {
         setError(data.message || '用户名或密码不正确');
       }
@@ -109,20 +126,29 @@ const LoginPage: React.FC = () => {
   return (
     <Layout className="login-layout">
       <Content className="login-content">
-    <div className="login-container">
-      <div className="login-banner">
+        <div className="login-container">
+          <div className="login-banner">
             <Typography>
               <Title level={2}>MITM OpenAI Server</Title>
-              <Paragraph>监控、拦截和分析AI API请求的工具</Paragraph>
-              <Space className="banner-links">
+              <Paragraph>
+                安全监控与分析OpenAI API请求的强大工具
+                <br />
+                实时拦截、记录和检查AI交互的完整内容
+              </Paragraph>
+              
+              <Space direction="vertical" className="banner-links">
                 <Link 
                   href="https://github.com/llm-sec/mitm-openai-server" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="github-link"
                 >
-                  <GithubOutlined /> GitHub 项目仓库
+                  <GithubOutlined style={{ fontSize: '16px' }} /> GitHub 项目仓库
                 </Link>
+                
+                <Text type="secondary" style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', marginTop: '40px' }}>
+                  <SafetyOutlined style={{ marginRight: 8 }} /> 安全可靠的专业工具
+                </Text>
               </Space>
             </Typography>
           </div>
@@ -130,7 +156,7 @@ const LoginPage: React.FC = () => {
           <Card 
             className="login-card" 
             bordered={false}
-            title={<Title level={3} style={{ textAlign: 'center', margin: 0 }}>登录</Title>}
+            title={<Title level={3} style={{ textAlign: 'center', margin: 0, color: '#1e3c72' }}>系统登录</Title>}
           >
             {error && (
               <Alert
@@ -155,11 +181,11 @@ const LoginPage: React.FC = () => {
                 rules={[{ required: true, message: '请输入用户名' }]}
               >
                 <Input 
-                  prefix={<UserOutlined />} 
+                  prefix={<UserOutlined style={{ color: '#1e3c72' }} />} 
                   placeholder="请输入用户名" 
                   autoComplete="username"
-                disabled={loading}
-              />
+                  disabled={loading}
+                />
               </Form.Item>
               
               <Form.Item
@@ -168,11 +194,11 @@ const LoginPage: React.FC = () => {
                 rules={[{ required: true, message: '请输入密码' }]}
               >
                 <Input.Password
-                  prefix={<LockOutlined />}
+                  prefix={<LockOutlined style={{ color: '#1e3c72' }} />}
                   placeholder="请输入密码"
                   autoComplete="current-password"
-            disabled={loading}
-                  iconRender={(visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
+                  disabled={loading}
+                  iconRender={(visible) => (visible ? <EyeTwoTone twoToneColor="#1e3c72" /> : <EyeInvisibleOutlined />)}
                 />
               </Form.Item>
               
@@ -187,13 +213,14 @@ const LoginPage: React.FC = () => {
                   loading={loading}
                   block
                   icon={<LoginOutlined />}
+                  className="login-form-button"
                 >
-                  {loading ? '登录中...' : '登录'}
+                  {loading ? '登录中...' : '登录系统'}
                 </Button>
               </Form.Item>
             </Form>
           </Card>
-      </div>
+        </div>
       </Content>
       <Footer />
     </Layout>
