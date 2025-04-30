@@ -24,14 +24,15 @@ import (
 // Server 表示API服务器
 // 是服务器的核心结构，包含路由引擎、存储接口和配置
 type Server struct {
-	router        *gin.Engine           // Gin路由引擎
-	storage       storage.Storage       // 存储接口
-	config        api.ServerConfig      // 服务器配置
-	openaiService openai.Service        // OpenAI服务接口
-	configManager *ConfigManager        // 配置管理器
-	uiServer      api.UIServerInterface // UI服务器接口
-	openaiHandler interface{}           // OpenAI API处理器，使用openai.Handler
-	storagePath   string                // 用户配置的数据存储路径
+	router              *gin.Engine           // Gin路由引擎
+	storage             storage.Storage       // 存储接口
+	config              api.ServerConfig      // 服务器配置
+	openaiService       openai.Service        // OpenAI服务接口
+	configManager       *ConfigManager        // 配置管理器
+	uiServer            api.UIServerInterface // UI服务器接口
+	openaiHandler       interface{}           // OpenAI API处理器，使用openai.Handler
+	storagePath         string                // 用户配置的数据存储路径
+	SuppressStartupInfo bool                  // 控制是否输出启动信息
 }
 
 // NewServer 创建一个新的服务器实例
@@ -106,8 +107,6 @@ func NewServerWithConfig(config api.ServerConfig) *Server {
 		newPassword := utils.GenerateRandomPassword(12)
 		server.config.UIPassword = newPassword
 
-		fmt.Printf("\n首次启动 - 已生成密码 (密码已保存到login.json文件)\n")
-
 		// 创建login.json文件
 		loginConfig := struct {
 			Username string `json:"username"`
@@ -124,12 +123,8 @@ func NewServerWithConfig(config api.ServerConfig) *Server {
 			err = os.WriteFile("login.json", data, 0644)
 			if err != nil {
 				fmt.Printf("警告: 无法写入login.json文件: %v\n", err)
-			} else {
-				fmt.Printf("成功创建login.json文件\n")
 			}
 		}
-	} else if server.config.UIPassword != "" {
-		fmt.Printf("\n使用已有密码: •••••••• (长度: %d)\n", len(server.config.UIPassword))
 	}
 
 	// 初始化OpenAI服务
@@ -179,7 +174,6 @@ func NewServerWithConfig(config api.ServerConfig) *Server {
 	// 确保UI服务器使用最新密码
 	if uiServer, ok := server.uiServer.(*api.UIServer); ok {
 		if server.config.UIPassword != "" && len(server.config.UIPassword) > 0 {
-			fmt.Printf("确认传递给UI服务器的密码: •••••••• (长度: %d)\n", len(server.config.UIPassword))
 			uiServer.SetConfig(server.config)
 		}
 	}
@@ -202,23 +196,26 @@ func (s *Server) Run(addr string) error {
 	// 不再调用ensurePassword方法，避免循环
 	// s.ensurePassword()
 
-	fmt.Println("\n┌─────────────────────────────────────────────────┐")
-	fmt.Println("│            MITM OpenAI Server 已启动            │")
-	fmt.Println("└─────────────────────────────────────────────────┘\n")
+	// 只有在SuppressStartupInfo为false时才输出启动信息
+	if !s.SuppressStartupInfo {
+		fmt.Println("\n┌─────────────────────────────────────────────────┐")
+		fmt.Println("│            MITM OpenAI Server 已启动            │")
+		fmt.Println("└─────────────────────────────────────────────────┘\n")
 
-	port := addr[1:] // 去掉":"
-	fmt.Printf("登录地址: http://localhost:%s/ui/login\n", port)
-	fmt.Printf("用户名:   %s\n", s.config.UIUsername)
+		port := addr[1:] // 去掉":"
+		fmt.Printf("登录地址: http://localhost:%s/ui/login\n", port)
+		fmt.Printf("用户名:   %s\n", s.config.UIUsername)
 
-	// 混淆密码显示
-	if s.config.UIPassword != "" {
-		maskedPassword := "••••••••"
-		fmt.Printf("密码:     %s\n", maskedPassword)
-	} else {
-		fmt.Printf("密码:     [未设置]\n")
+		// 混淆密码显示
+		if s.config.UIPassword != "" {
+			maskedPassword := "••••••••"
+			fmt.Printf("密码:     %s\n", maskedPassword)
+		} else {
+			fmt.Printf("密码:     [未设置]\n")
+		}
+
+		fmt.Println("\n请使用上述凭据登录系统，监控和分析OpenAI API请求。\n")
 	}
-
-	fmt.Println("\n请使用上述凭据登录系统，监控和分析OpenAI API请求。\n")
 
 	return s.router.Run(addr)
 }
@@ -441,15 +438,24 @@ func (s *Server) setupUIRoutes() {
 
 	// 任何未处理的UI路由都重定向到index.html，实现SPA路由
 	s.router.NoRoute(func(c *gin.Context) {
-		if strings.HasPrefix(c.Request.URL.Path, "/ui/") {
-			c.File(embed.ResolvePath(uiPath, "index.html"))
-		} else if !strings.HasPrefix(c.Request.URL.Path, "/api/") &&
-			!strings.HasPrefix(c.Request.URL.Path, "/v1/") {
-			// 对于非API路径的请求，也返回前端应用
-			c.File(embed.ResolvePath(uiPath, "index.html"))
-		} else {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
+		path := c.Request.URL.Path
+
+		// 检查是否是未定义的API路径
+		if strings.HasPrefix(path, "/ui/api/") {
+			// 对于未实现的UI API路径，返回404而不是前端页面
+			c.JSON(http.StatusNotFound, gin.H{"code": 10004, "msg": "API接口不存在"})
+			return
 		}
+
+		// 对于UI路径或其他非API路径，返回前端应用
+		if strings.HasPrefix(path, "/ui/") ||
+			(!strings.HasPrefix(path, "/api/") && !strings.HasPrefix(path, "/v1/")) {
+			c.File(embed.ResolvePath(uiPath, "index.html"))
+			return
+		}
+
+		// 其他情况返回404
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
 	})
 }
 

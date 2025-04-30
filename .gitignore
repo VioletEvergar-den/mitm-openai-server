@@ -67,3 +67,7 @@ react-ui/pkg/
 
 
 
+
+# 构建产物
+server
+ui/
