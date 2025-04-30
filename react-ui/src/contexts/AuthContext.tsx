@@ -4,7 +4,7 @@ import { utils } from '../services/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  login: (username: string, password: string, expiryDays?: number) => void;
+  login: (username: string) => void;
   logout: () => void;
 }
 
@@ -23,9 +23,9 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     isAuthenticated: utils.isAuthenticated()
   });
 
-  // 登录方法
-  const login = (username: string, password: string, expiryDays = 1) => {
-    utils.saveAuth(username, password, expiryDays);
+  // 登录方法 - 不再需要保存密码，只存储用户名和认证状态
+  const login = (username: string) => {
+    // token已经在调用此函数前被utils.saveAuth保存
     setAuthState({ isAuthenticated: true, username });
   };
 

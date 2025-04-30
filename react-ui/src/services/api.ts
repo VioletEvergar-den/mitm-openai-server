@@ -6,50 +6,151 @@ const API = axios.create({
   baseURL: '/ui/api',
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  withCredentials: true // 启用跨域凭证支持
 });
 
 // 拦截器添加认证信息
 API.interceptors.request.use(config => {
-  const auth = localStorage.getItem('auth');
-  if (auth) {
-    config.headers.Authorization = `Basic ${auth}`;
+  // 从多个来源获取token
+  let token = localStorage.getItem('auth_token');
+  
+  if (!token) {
+    token = sessionStorage.getItem('auth_token');
   }
+  
+  if (!token) {
+    const cookieMatch = document.cookie.match(/auth_token=([^;]+)/);
+    if (cookieMatch && cookieMatch[1]) {
+      token = cookieMatch[1];
+    }
+  }
+  
+  if (token) {
+    // 使用Bearer格式
+    config.headers.Authorization = `Bearer ${token}`;
+    // 同时尝试使用自定义头，某些代理可能会保留这个
+    config.headers['X-Auth-Token'] = token;
+    console.log(`已添加认证头: Bearer ${token.substring(0, 10)}... (${token.length}字符)`);
+  } else {
+    console.warn('发送请求时未找到认证令牌! 这将导致401错误');
+  }
+  
+  console.log(`正在发送${config.method?.toUpperCase()}请求到: ${config.baseURL}${config.url}`, config.headers);
   return config;
+}, error => {
+  console.error('请求拦截器错误:', error);
+  return Promise.reject(error);
 });
 
 // 拦截器处理认证失败
 API.interceptors.response.use(
-  response => response,
+  response => {
+    console.log(`请求成功: ${response.config.url}, 状态码: ${response.status}`);
+    return response;
+  },
   error => {
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('auth');
-      window.location.href = '/login';
+    console.error('API错误响应:', error);
+    
+    if (error.response) {
+      console.error(`响应状态: ${error.response.status}`);
+      console.error('响应数据:', error.response.data);
+      
+      if (error.response.status === 401) {
+        console.warn('收到401未授权响应，即将清除token并重定向到登录页');
+        localStorage.removeItem('auth_token');
+        window.location.href = '/login';
+      }
+    } else if (error.request) {
+      console.error('没有收到响应:', error.request);
+    } else {
+      console.error('请求设置错误:', error.message);
     }
+    
     return Promise.reject(error);
   }
 );
 
 // 工具函数
 export const utils = {
-  saveAuth: (username: string, password: string, expiryDays = 365) => {
-    const auth = btoa(`${username}:${password}`);
-    localStorage.setItem('auth', auth);
-    
-    // 设置cookie有效期
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + expiryDays);
-    
-    document.cookie = `auth=${auth}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Strict`;
+  saveAuth: (token: string, expiryDays = 365) => {
+    try {
+      console.log(`正在保存token: ${token.substring(0, 10)}...`);
+      
+      // 直接保存token，不需要用户名和密码
+      localStorage.removeItem('auth_token'); // 先清除
+      localStorage.setItem('auth_token', token);
+      
+      // 验证保存是否成功
+      const savedToken = localStorage.getItem('auth_token');
+      if (!savedToken) {
+        console.error('Token保存失败! localStorage.getItem返回null');
+      } else if (savedToken !== token) {
+        console.error('Token保存不一致!', 
+          '预期:', token.substring(0, 10) + '...', 
+          '实际:', savedToken.substring(0, 10) + '...');
+      } else {
+        console.log('Token成功保存到localStorage');
+      }
+      
+      // 设置cookie有效期
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + expiryDays);
+      
+      // 设置cookie，允许跨域访问
+      const cookieOptions = `expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax`;
+      document.cookie = `auth_token=${token}; ${cookieOptions}`;
+      
+      // 同时设置会话存储作为备份
+      sessionStorage.setItem('auth_token', token);
+      
+      console.log('认证信息已保存完成');
+    } catch (error) {
+      console.error('保存token时出错:', error);
+      // 尝试使用备选存储方式
+      try {
+        sessionStorage.setItem('auth_token', token);
+        console.log('已使用sessionStorage作为备选存储');
+      } catch (e) {
+        console.error('所有存储方式都失败');
+      }
+    }
   },
   
   clearAuth: () => {
-    localStorage.removeItem('auth');
-    document.cookie = 'auth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Strict';
+    console.log('正在清除认证信息');
+    localStorage.removeItem('auth_token');
+    sessionStorage.removeItem('auth_token');
+    document.cookie = 'auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax';
+    console.log('认证信息已清除');
   },
   
   isAuthenticated: () => {
-    return !!localStorage.getItem('auth');
+    // 首先检查localStorage
+    const localToken = localStorage.getItem('auth_token');
+    if (localToken) {
+      console.log('从localStorage中发现token');
+      return true;
+    }
+    
+    // 然后检查sessionStorage
+    const sessionToken = sessionStorage.getItem('auth_token');
+    if (sessionToken) {
+      console.log('从sessionStorage中发现token，正在恢复到localStorage');
+      localStorage.setItem('auth_token', sessionToken);
+      return true;
+    }
+    
+    // 最后检查cookie
+    const cookieMatch = document.cookie.match(/auth_token=([^;]+)/);
+    if (cookieMatch && cookieMatch[1]) {
+      console.log('从cookie中发现token，正在恢复到localStorage');
+      localStorage.setItem('auth_token', cookieMatch[1]);
+      return true;
+    }
+    
+    console.log('未找到有效token');
+    return false;
   },
   
   formatDateTime: (dateString: string) => {
@@ -78,13 +179,42 @@ export const apiService = {
   // 认证
   login: async (username: string, password: string) => {
     try {
-      // 设置认证头
-      utils.saveAuth(username, password);
+      console.log('尝试登录，用户名:', username);
       
-      // 测试认证是否成功
-      await API.get('/server-info');
-      return true;
+      // 使用增强的API实例而不是直接使用axios
+      const response = await API.post('/login', {
+        username,
+        password
+      });
+      
+      console.log('登录API响应:', response.data);
+      
+      // 检查登录是否成功
+      if (response.data && response.data.status === 'success' && response.data.token) {
+        console.log('API登录成功，token:', response.data.token.substring(0, 10) + '...');
+        // 保存返回的token
+        utils.saveAuth(response.data.token);
+        console.log('Token已保存到localStorage:', localStorage.getItem('auth_token') ? '存在' : '不存在');
+        
+        // 添加实际的检查
+        const savedToken = localStorage.getItem('auth_token');
+        if (!savedToken || savedToken !== response.data.token) {
+          console.error('Token保存不一致!', 
+            '保存的:', savedToken ? savedToken.substring(0, 10) + '...' : '不存在', 
+            '服务器返回:', response.data.token.substring(0, 10) + '...');
+        }
+        
+        return true;
+      }
+      
+      console.log('API登录失败，没有有效token');
+      return false;
     } catch (error) {
+      console.error('API登录出错:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('登录响应状态:', error.response.status);
+        console.error('登录响应数据:', error.response.data);
+      }
       utils.clearAuth();
       return false;
     }
