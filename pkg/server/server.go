@@ -206,10 +206,9 @@ func (s *Server) Run(addr string) error {
 		fmt.Printf("登录地址: http://localhost:%s/ui/login\n", port)
 		fmt.Printf("用户名:   %s\n", s.config.UIUsername)
 
-		// 混淆密码显示
+		// 显示真实密码
 		if s.config.UIPassword != "" {
-			maskedPassword := "••••••••"
-			fmt.Printf("密码:     %s\n", maskedPassword)
+			fmt.Printf("密码:     %s\n", s.config.UIPassword)
 		} else {
 			fmt.Printf("密码:     [未设置]\n")
 		}
@@ -405,9 +404,6 @@ func (s *Server) setupUIRoutes() {
 		uiPath = "./ui" // 默认UI目录
 	}
 
-	// 获取文件系统
-	fileSystem := embed.GetFS(uiPath)
-
 	// 设置UI路由
 	s.uiServer.SetupUIRoutes(s.router, s.authMiddleware(), s.apiMiddleware())
 
@@ -419,26 +415,29 @@ func (s *Server) setupUIRoutes() {
 		c.File(embed.ResolvePath(uiPath, "index.html"))
 	})
 
-	// 根路径直接提供内容，不重定向
+	// 根路径重定向到UI路径，让React Router处理认证逻辑
 	s.router.GET("/", func(c *gin.Context) {
-		c.File(embed.ResolvePath(uiPath, "index.html"))
+		c.Redirect(http.StatusFound, "/ui/")
 	})
 
-	// 处理静态文件，注意顺序
-	s.router.StaticFS("/ui/static", fileSystem)
-	s.router.StaticFS("/ui/css", fileSystem)
-	s.router.StaticFS("/ui/js", fileSystem)
-	s.router.StaticFS("/ui/assets", fileSystem)
+	// 处理静态文件 - 确保assets和其他静态资源能被正确访问
+	// 将 /ui/assets 映射到 dist/assets 目录
+	s.router.Static("/ui/assets", embed.ResolvePath(uiPath, "assets"))
+	s.router.Static("/ui/static", embed.ResolvePath(uiPath, "static"))
 
-	// 根路径下的静态文件
-	s.router.StaticFS("/static", fileSystem)
-	s.router.StaticFS("/css", fileSystem)
-	s.router.StaticFS("/js", fileSystem)
-	s.router.StaticFS("/assets", fileSystem)
+	// 根路径下的静态文件，为了兼容性
+	s.router.Static("/assets", embed.ResolvePath(uiPath, "assets"))
+	s.router.Static("/static", embed.ResolvePath(uiPath, "static"))
 
 	// 任何未处理的UI路由都重定向到index.html，实现SPA路由
 	s.router.NoRoute(func(c *gin.Context) {
 		path := c.Request.URL.Path
+
+		// 根路径在上面已经处理了重定向，这里排除掉
+		if path == "/" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
+			return
+		}
 
 		// 检查是否是未定义的API路径
 		if strings.HasPrefix(path, "/ui/api/") {
@@ -580,9 +579,22 @@ func (s *Server) apiMiddleware() gin.HandlerFunc {
 			Latency:    latency,
 		}
 
+		// 获取用户信息（为了支持用户隔离）
+		var userID int64 = 0 // 默认用户ID为0（匿名用户）
+		var username string = "api_user"
+
+		// 尝试从上下文中获取用户信息
+		if uid, exists := c.Get("user_id"); exists {
+			if uname, exists := c.Get("username"); exists {
+				userID = uid.(int64)
+				username = uname.(string)
+			}
+		}
+
 		// 创建请求记录
 		request := &storage.Request{
 			ID:        requestID,
+			UserID:    userID,
 			Method:    method,
 			Path:      path,
 			Timestamp: time.Now(),
@@ -593,11 +605,13 @@ func (s *Server) apiMiddleware() gin.HandlerFunc {
 			Response:  response,
 			Metadata: map[string]interface{}{
 				"latency_ms": latency,
+				"user_id":    userID,
+				"username":   username,
 			},
 		}
 
 		// 保存请求到存储
-		if err := s.storage.SaveRequest(request); err != nil {
+		if err := s.storage.SaveRequest(userID, request); err != nil {
 			// 记录错误，但不中断请求处理
 			fmt.Printf("无法保存请求: %v\n", err)
 		}

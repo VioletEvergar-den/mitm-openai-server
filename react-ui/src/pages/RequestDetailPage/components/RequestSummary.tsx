@@ -1,7 +1,6 @@
 import React from 'react';
-import { Descriptions, Tag, Typography } from 'antd';
+import { Descriptions, Tag, Typography, Space } from 'antd';
 import { ClockCircleOutlined } from '@ant-design/icons';
-import './RequestSummary.css';
 
 interface RequestSummaryProps {
   id: string;
@@ -21,15 +20,17 @@ const RequestSummary: React.FC<RequestSummaryProps> = ({
   getStatusColor
 }) => {
   return (
-    <Descriptions bordered column={{ xxl: 4, xl: 3, lg: 3, md: 2, sm: 1, xs: 1 }}>
+    <Descriptions bordered column={{ xxl: 4, xl: 3, lg: 3, md: 2, sm: 1, xs: 1 }} style={{ marginTop: 24 }}>
       <Descriptions.Item label="请求ID">{id}</Descriptions.Item>
       <Descriptions.Item label="时间">
-        {new Date(timestamp).toLocaleString()}
-        {latency && (
-          <Tag color="blue" className="latency-badge">
-            <ClockCircleOutlined /> {latency}ms
-          </Tag>
-        )}
+        <Space>
+          {new Date(timestamp).toLocaleString()}
+          {latency != null && (
+            <Tag color="blue" icon={<ClockCircleOutlined />}>
+              {latency}ms
+            </Tag>
+          )}
+        </Space>
       </Descriptions.Item>
       <Descriptions.Item label="状态码">
         <Tag color={getStatusColor(statusCode)}>

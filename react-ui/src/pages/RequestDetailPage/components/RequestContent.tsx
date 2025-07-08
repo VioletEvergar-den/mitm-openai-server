@@ -1,6 +1,6 @@
 import React from 'react';
+import { Space } from 'antd';
 import JsonCardView from './JsonCardView';
-import './RequestContent.css';
 
 interface RequestContentProps {
   requestHeaders: any;
@@ -18,7 +18,7 @@ const RequestContent: React.FC<RequestContentProps> = ({
   jsonPrettyTheme
 }) => {
   return (
-    <div className="request-content">
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <JsonCardView
         title="请求头"
         data={requestHeaders}
@@ -31,7 +31,6 @@ const RequestContent: React.FC<RequestContentProps> = ({
           title="查询参数"
           data={queryParams}
           copyToClipboard={copyToClipboard}
-          style={{ marginTop: 16 }}
           jsonPrettyTheme={jsonPrettyTheme}
         />
       )}
@@ -41,11 +40,10 @@ const RequestContent: React.FC<RequestContentProps> = ({
           title="请求体"
           data={requestBody}
           copyToClipboard={copyToClipboard}
-          style={{ marginTop: 16 }}
           jsonPrettyTheme={jsonPrettyTheme}
         />
       )}
-    </div>
+    </Space>
   );
 };
 

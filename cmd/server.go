@@ -105,27 +105,15 @@ func runServer() {
 	// 设置Gin为发布模式，减少控制台输出
 	gin.SetMode(gin.ReleaseMode)
 
-	// 尝试从配置文件获取存储路径
-	homeDir, err := os.UserHomeDir()
-	var customStoragePath string
-	if err == nil {
-		configDir := filepath.Join(homeDir, ".mitm-openai-server")
-		configFile := filepath.Join(configDir, "storage_path.txt")
-		data, err := os.ReadFile(configFile)
-		if err == nil && len(data) > 0 {
-			customStoragePath = string(data)
-		}
-	}
-
 	// 确定最终使用的数据目录
 	finalDataDir := dataDir
-	if customStoragePath != "" {
-		finalDataDir = customStoragePath
-	} else {
-		// 如果没有自定义路径，使用当前目录下的data文件夹
+	if finalDataDir == "" {
+		// 如果没有指定路径，使用当前目录下的data文件夹
 		currentDir, err := os.Getwd()
 		if err == nil {
 			finalDataDir = filepath.Join(currentDir, "data")
+		} else {
+			finalDataDir = "./data"
 		}
 	}
 
@@ -154,33 +142,14 @@ func runServer() {
 		log.Printf("UI文件目录: %s", absUIDir)
 	}
 
-	// 创建存储
-	var storageImpl storage.Storage
-	var storageErr error
+	// 强制使用SQLite存储（用户隔离需要数据库支持）
+	if verbose {
+		log.Printf("使用SQLite数据库存储，数据库路径: %s/mitm_server.db", absDataDir)
+	}
 
-	if useSQL {
-		// 使用SQLite存储
-		dbPath := sqlitePath
-		if dbPath == "" {
-			dbPath = filepath.Join(absDataDir, "requests.db")
-		}
-
-		if verbose {
-			log.Printf("使用SQLite存储，数据库路径: %s", dbPath)
-		}
-		storageImpl, storageErr = storage.NewSQLiteStorage(dbPath)
-		if storageErr != nil {
-			log.Fatalf("初始化SQLite存储失败: %v", storageErr)
-		}
-	} else {
-		// 使用文件存储
-		if verbose {
-			log.Printf("使用文件存储，数据目录: %s", absDataDir)
-		}
-		storageImpl, storageErr = storage.NewFileSystemStorage(absDataDir)
-		if storageErr != nil {
-			log.Fatalf("初始化文件存储失败: %v", storageErr)
-		}
+	storageImpl, storageErr := storage.NewSQLiteStorage(absDataDir)
+	if storageErr != nil {
+		log.Fatalf("初始化SQLite存储失败: %v", storageErr)
 	}
 
 	// 创建服务器配置
@@ -229,30 +198,23 @@ func runServer() {
 	// 获取UI配置
 	serverConfig := apiServer.GetConfig()
 
-	// 精简登录信息显示 - 已删除重复的框
+	// 精简登录信息显示 - 数据库版本
 	fmt.Println()
-	fmt.Println(colorBold + colorCyan + "┌─────────────────────────────────────────────────┐" + colorReset)
-	fmt.Println(colorBold + colorCyan + "│            MITM OpenAI Server 已启动            │" + colorReset)
-	fmt.Println(colorBold + colorCyan + "└─────────────────────────────────────────────────┘" + colorReset)
+	fmt.Printf("%s┌─────────────────────────────────────────────────┐%s\n", colorGreen+colorBold, colorReset)
+	fmt.Printf("%s│%s%s            MITM OpenAI Server 已启动            %s%s│%s\n", colorGreen+colorBold, colorReset, colorWhite+colorBold, colorReset, colorGreen+colorBold, colorReset)
+	fmt.Printf("%s│%s%s              (多用户数据库版本)                %s%s│%s\n", colorGreen+colorBold, colorReset, colorCyan, colorReset, colorGreen+colorBold, colorReset)
+	fmt.Printf("%s└─────────────────────────────────────────────────┘%s\n", colorGreen+colorBold, colorReset)
+	fmt.Printf("登录地址: %s%shttp://localhost%s/ui/login%s\n", colorBlue+colorBold, addr, colorReset, colorReset)
+	fmt.Printf("用户名:   %s%s%s\n", colorYellow+colorBold, serverConfig.UIUsername, colorReset)
+	fmt.Printf("密码:     %s%s%s\n", colorYellow+colorBold, serverConfig.UIPassword, colorReset)
+	fmt.Printf("数据库:   %s%s/mitm_server.db%s\n", colorCyan, absDataDir, colorReset)
+	fmt.Printf("存储模式: %s多用户隔离 (SQLite)%s\n", colorGreen+colorBold, colorReset)
 	fmt.Println()
-	fmt.Printf("%s登录地址:%s %shttp://localhost%s/ui/login%s\n", colorBold, colorReset, colorGreen, addr, colorReset)
-	fmt.Printf("%s用户名:%s   %s%s%s\n", colorBold, colorReset, colorPurple, serverConfig.UIUsername, colorReset)
-
-	// 显示真实密码，帮助用户登录
-	if serverConfig.UIPassword != "" {
-		fmt.Printf("%s密码:%s     %s%s%s\n", colorBold, colorReset, colorPurple, serverConfig.UIPassword, colorReset)
-	} else {
-		fmt.Printf("%s密码:%s     %s[未设置]%s\n", colorBold, colorReset, colorRed, colorReset)
-	}
-
-	fmt.Println()
-	fmt.Println(colorBold + "请使用上述凭据登录系统，监控和分析OpenAI API请求。" + colorReset)
+	fmt.Printf("%s请使用上述凭据登录系统，监控和分析OpenAI API请求。%s\n", colorWhite, colorReset)
+	fmt.Printf("%s每个用户的数据完全隔离，支持多用户同时使用。%s\n", colorGreen, colorReset)
 	fmt.Println()
 
-	// 启动服务器 - 启动前修改服务器的Run方法，避免重复输出
-	// 设置标志禁止重复输出启动信息
-	apiServer.SuppressStartupInfo = true
-
+	// 启动服务器
 	if err := apiServer.Run(addr); err != nil {
 		log.Fatalf("启动服务器失败: %v", err)
 	}

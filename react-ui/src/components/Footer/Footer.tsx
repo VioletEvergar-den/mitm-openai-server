@@ -1,20 +1,24 @@
 import React from 'react';
-import { Layout, Typography } from 'antd';
+import { Layout } from 'antd';
 import './Footer.css';
 
 const { Footer: AntFooter } = Layout;
-const { Link } = Typography;
 
 const Footer: React.FC = () => {
   return (
     <AntFooter className="footer">
-      <Link 
-        href="https://github.com/llm-sec/mitm-openai-server" 
-        target="_blank" 
-        rel="noopener noreferrer"
-      >
-        MITM OpenAI Server
-      </Link> © 2025
+      <div className="footer-content">
+        <a 
+          href="https://github.com/llm-sec/mitm-openai-server" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="footer-link"
+        >
+          MITM OpenAI Server
+        </a>
+        <span className="footer-divider">•</span>
+        <span className="footer-copyright">2025</span>
+      </div>
     </AntFooter>
   );
 };

@@ -1,0 +1,8 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+
+- 对前端的改动需要执行./start.sh脚本才会生效
+- 

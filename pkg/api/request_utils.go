@@ -11,12 +11,13 @@ import (
 // SaveRequest 保存请求到存储
 // 将API请求模型转换为存储请求模型并保存
 // 参数:
+//   - userID: 用户ID
 //   - req: 要保存的请求
 //   - storage: 存储接口
 //
 // 返回:
 //   - error: 如果保存失败，返回错误
-func SaveRequest(req *Request, store storage.Storage) error {
+func SaveRequest(userID int64, req *Request, store storage.Storage) error {
 	// 解析时间戳
 	var timestamp time.Time
 	if req.Timestamp != "" {
@@ -33,6 +34,7 @@ func SaveRequest(req *Request, store storage.Storage) error {
 	// 转换API请求模型为存储请求模型
 	storageReq := &storage.Request{
 		ID:        req.ID,
+		UserID:    userID,
 		Method:    req.Method,
 		Path:      req.Path,
 		Timestamp: timestamp,
@@ -54,7 +56,7 @@ func SaveRequest(req *Request, store storage.Storage) error {
 	}
 
 	// 保存到存储
-	return store.SaveRequest(storageReq)
+	return store.SaveRequest(userID, storageReq)
 }
 
 // ConvertStorageToAPIRequest 将存储请求模型转换为API请求模型

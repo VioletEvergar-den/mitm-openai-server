@@ -172,9 +172,13 @@ func (h *Handler) HandleRequest(c *gin.Context) {
 		Latency:    time.Since(startTime).Milliseconds(),
 	}
 
+	// 获取用户信息（为了向后兼容）
+	userID, username := h.getUserFromContext(c)
+
 	// 保存请求和响应
 	request := &storage.Request{
 		ID:        uuid.New().String(),
+		UserID:    userID,
 		Method:    method,
 		Path:      path,
 		Timestamp: time.Now(),
@@ -185,12 +189,14 @@ func (h *Handler) HandleRequest(c *gin.Context) {
 		Response:  response,
 		Metadata: map[string]interface{}{
 			"source":     "openai_handler",
+			"user_id":    userID,
+			"username":   username,
 			"latency_ms": time.Since(startTime).Milliseconds(),
 		},
 	}
 
 	// 保存请求
-	h.SaveRequest(request)
+	h.SaveRequest(userID, request)
 
 	// 设置响应头
 	for key, value := range responseHeaders {
@@ -201,13 +207,479 @@ func (h *Handler) HandleRequest(c *gin.Context) {
 	c.JSON(statusCode, responseBody)
 }
 
-// SaveRequest 保存请求记录到存储
-// 这是一个公开的方法，允许外部代码保存请求数据
-// 参数:
-//   - request: 要保存的请求记录
-func (h *Handler) SaveRequest(request *storage.Request) error {
+// SaveRequest 保存请求记录到存储（支持用户隔离）
+func (h *Handler) SaveRequest(userID int64, request *storage.Request) error {
 	if h.storage == nil {
 		return fmt.Errorf("存储未初始化")
 	}
-	return h.storage.SaveRequest(request)
+
+	// 确保请求记录包含用户ID
+	request.UserID = userID
+
+	// 使用新的存储接口保存请求
+	return h.storage.SaveRequest(userID, request)
+}
+
+// getUserFromContext 从gin.Context中获取用户信息
+// 如果无法获取用户信息，返回默认用户ID（用于向后兼容）
+func (h *Handler) getUserFromContext(c *gin.Context) (int64, string) {
+	// 尝试从上下文中获取用户信息
+	if userID, exists := c.Get("user_id"); exists {
+		if username, exists := c.Get("username"); exists {
+			return userID.(int64), username.(string)
+		}
+	}
+
+	// 如果没有用户上下文，检查是否有Authorization头
+	authHeader := c.GetHeader("Authorization")
+	if authHeader != "" {
+		// 简单的token解析，实际应用中需要更严格的验证
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			// 为了向后兼容，暂时使用默认用户
+			return 0, "api_user"
+		}
+	}
+
+	// 默认情况：使用匿名用户（ID为0，username为api_user）
+	return 0, "api_user"
+}
+
+// HandleOpenAIRequest 处理OpenAI API请求的通用处理器
+func (h *Handler) HandleOpenAIRequest(c *gin.Context) {
+	// 记录开始时间，用于计算延迟
+	startTime := time.Now()
+
+	// 获取用户信息
+	userID, username := h.getUserFromContext(c)
+
+	// 获取请求信息
+	method := c.Request.Method
+	path := c.Request.URL.Path
+
+	// 获取查询参数
+	queryParams := make(map[string]string)
+	for key, values := range c.Request.URL.Query() {
+		if len(values) > 0 {
+			queryParams[key] = values[0]
+		}
+	}
+
+	// 获取请求头
+	headers := make(map[string]string)
+	for key, values := range c.Request.Header {
+		if len(values) > 0 {
+			headers[key] = values[0]
+		}
+	}
+
+	// 读取请求体
+	var bodyBytes []byte
+	if c.Request.Body != nil {
+		bodyBytes, _ = io.ReadAll(c.Request.Body)
+		// 重新创建一个可读的Body
+		c.Request.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
+	}
+
+	// 解析请求体为JSON（如果可能）
+	var bodyJSON interface{}
+	if len(bodyBytes) > 0 {
+		json.Unmarshal(bodyBytes, &bodyJSON)
+	}
+
+	// 添加用户标识到元数据
+	metadata := map[string]interface{}{
+		"source":       "openai_handler",
+		"user_id":      userID,
+		"username":     username,
+		"request_time": startTime.Format(time.RFC3339),
+	}
+
+	// 使用服务处理请求
+	statusCode, responseHeaders, responseBody, err := h.openaiService.HandleRequest(
+		method, path, headers, queryParams, bodyBytes,
+	)
+
+	// 计算处理延迟
+	latency := time.Since(startTime).Milliseconds()
+	metadata["latency_ms"] = latency
+
+	if err != nil {
+		// 处理失败的情况
+		metadata["error"] = err.Error()
+
+		// 创建错误响应
+		errorResponse := map[string]interface{}{
+			"error": map[string]interface{}{
+				"message": fmt.Sprintf("处理请求失败: %v", err),
+				"type":    "internal_error",
+				"code":    "processing_failed",
+			},
+		}
+
+		// 保存失败的请求记录
+		request := &storage.Request{
+			ID:        uuid.New().String(),
+			UserID:    userID,
+			Method:    method,
+			Path:      path,
+			Timestamp: time.Now(),
+			Headers:   headers,
+			Query:     queryParams,
+			Body:      bodyJSON,
+			ClientIP:  utils.GetClientIP(c.Request),
+			Response: &storage.ProxyResponse{
+				StatusCode: http.StatusInternalServerError,
+				Headers:    map[string]string{"Content-Type": "application/json"},
+				Body:       errorResponse,
+				Latency:    latency,
+			},
+			Metadata: metadata,
+		}
+
+		h.SaveRequest(userID, request)
+
+		c.JSON(http.StatusInternalServerError, errorResponse)
+		return
+	}
+
+	// 处理成功的情况
+	response := &storage.ProxyResponse{
+		StatusCode: statusCode,
+		Headers:    responseHeaders,
+		Body:       responseBody,
+		Latency:    latency,
+	}
+
+	// 保存成功的请求和响应
+	request := &storage.Request{
+		ID:        uuid.New().String(),
+		UserID:    userID,
+		Method:    method,
+		Path:      path,
+		Timestamp: time.Now(),
+		Headers:   headers,
+		Query:     queryParams,
+		Body:      bodyJSON,
+		ClientIP:  utils.GetClientIP(c.Request),
+		Response:  response,
+		Metadata:  metadata,
+	}
+
+	h.SaveRequest(userID, request)
+
+	// 设置响应头
+	for key, value := range responseHeaders {
+		c.Header(key, value)
+	}
+
+	// 返回响应
+	c.JSON(statusCode, responseBody)
+}
+
+// HandleChatCompletions 处理聊天完成请求
+func (h *Handler) HandleChatCompletions(c *gin.Context) {
+	// 获取用户信息
+	userID, username := h.getUserFromContext(c)
+
+	// 读取请求体
+	var bodyBytes []byte
+	if c.Request.Body != nil {
+		bodyBytes, _ = io.ReadAll(c.Request.Body)
+		c.Request.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
+	}
+
+	// 解析聊天请求
+	var chatRequest ChatCompletionRequest
+	if err := json.Unmarshal(bodyBytes, &chatRequest); err != nil {
+		errorResponse := map[string]interface{}{
+			"error": map[string]interface{}{
+				"message": "Invalid JSON in request body",
+				"type":    "invalid_request_error",
+				"code":    "json_invalid",
+			},
+		}
+
+		// 保存错误请求记录
+		request := &storage.Request{
+			ID:        uuid.New().String(),
+			UserID:    userID,
+			Method:    "POST",
+			Path:      "/v1/chat/completions",
+			Timestamp: time.Now(),
+			Headers:   map[string]string{"Content-Type": "application/json"},
+			Query:     map[string]string{},
+			Body:      string(bodyBytes),
+			ClientIP:  utils.GetClientIP(c.Request),
+			Metadata: map[string]interface{}{
+				"source":    "chat_completions_handler",
+				"user_id":   userID,
+				"username":  username,
+				"error":     "invalid_json",
+				"error_msg": err.Error(),
+			},
+		}
+
+		h.SaveRequest(userID, request)
+
+		c.JSON(http.StatusBadRequest, errorResponse)
+		return
+	}
+
+	// 验证必要字段
+	if len(chatRequest.Messages) == 0 {
+		errorResponse := map[string]interface{}{
+			"error": map[string]interface{}{
+				"message": "At least one message is required",
+				"type":    "invalid_request_error",
+				"code":    "missing_messages",
+			},
+		}
+
+		// 保存错误请求记录
+		request := &storage.Request{
+			ID:        uuid.New().String(),
+			UserID:    userID,
+			Method:    "POST",
+			Path:      "/v1/chat/completions",
+			Timestamp: time.Now(),
+			Headers:   map[string]string{"Content-Type": "application/json"},
+			Query:     map[string]string{},
+			Body:      chatRequest,
+			ClientIP:  utils.GetClientIP(c.Request),
+			Metadata: map[string]interface{}{
+				"source":   "chat_completions_handler",
+				"user_id":  userID,
+				"username": username,
+				"error":    "missing_messages",
+			},
+		}
+
+		h.SaveRequest(userID, request)
+
+		c.JSON(http.StatusBadRequest, errorResponse)
+		return
+	}
+
+	// 委托给通用处理器
+	h.HandleOpenAIRequest(c)
+}
+
+// HandleEmbeddings 处理嵌入请求
+func (h *Handler) HandleEmbeddings(c *gin.Context) {
+	// 获取用户信息
+	userID, username := h.getUserFromContext(c)
+
+	// 读取请求体
+	var bodyBytes []byte
+	if c.Request.Body != nil {
+		bodyBytes, _ = io.ReadAll(c.Request.Body)
+		c.Request.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
+	}
+
+	// 解析嵌入请求
+	var embeddingRequest EmbeddingRequest
+	if err := json.Unmarshal(bodyBytes, &embeddingRequest); err != nil {
+		errorResponse := map[string]interface{}{
+			"error": map[string]interface{}{
+				"message": "Invalid JSON in request body",
+				"type":    "invalid_request_error",
+				"code":    "json_invalid",
+			},
+		}
+
+		// 保存错误请求记录
+		request := &storage.Request{
+			ID:        uuid.New().String(),
+			UserID:    userID,
+			Method:    "POST",
+			Path:      "/v1/embeddings",
+			Timestamp: time.Now(),
+			Headers:   map[string]string{"Content-Type": "application/json"},
+			Query:     map[string]string{},
+			Body:      string(bodyBytes),
+			ClientIP:  utils.GetClientIP(c.Request),
+			Metadata: map[string]interface{}{
+				"source":    "embeddings_handler",
+				"user_id":   userID,
+				"username":  username,
+				"error":     "invalid_json",
+				"error_msg": err.Error(),
+			},
+		}
+
+		h.SaveRequest(userID, request)
+
+		c.JSON(http.StatusBadRequest, errorResponse)
+		return
+	}
+
+	// 验证必要字段
+	if embeddingRequest.Input == nil || embeddingRequest.Input == "" {
+		errorResponse := map[string]interface{}{
+			"error": map[string]interface{}{
+				"message": "Input text is required",
+				"type":    "invalid_request_error",
+				"code":    "missing_input",
+			},
+		}
+
+		// 保存错误请求记录
+		request := &storage.Request{
+			ID:        uuid.New().String(),
+			UserID:    userID,
+			Method:    "POST",
+			Path:      "/v1/embeddings",
+			Timestamp: time.Now(),
+			Headers:   map[string]string{"Content-Type": "application/json"},
+			Query:     map[string]string{},
+			Body:      embeddingRequest,
+			ClientIP:  utils.GetClientIP(c.Request),
+			Metadata: map[string]interface{}{
+				"source":   "embeddings_handler",
+				"user_id":  userID,
+				"username": username,
+				"error":    "missing_input",
+			},
+		}
+
+		h.SaveRequest(userID, request)
+
+		c.JSON(http.StatusBadRequest, errorResponse)
+		return
+	}
+
+	// 委托给通用处理器
+	h.HandleOpenAIRequest(c)
+}
+
+// HandleCompletions 处理文本完成请求
+func (h *Handler) HandleCompletions(c *gin.Context) {
+	// 获取用户信息
+	userID, username := h.getUserFromContext(c)
+
+	// 读取请求体
+	var bodyBytes []byte
+	if c.Request.Body != nil {
+		bodyBytes, _ = io.ReadAll(c.Request.Body)
+		c.Request.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
+	}
+
+	// 解析完成请求
+	var completionRequest CompletionRequest
+	if err := json.Unmarshal(bodyBytes, &completionRequest); err != nil {
+		errorResponse := map[string]interface{}{
+			"error": map[string]interface{}{
+				"message": "Invalid JSON in request body",
+				"type":    "invalid_request_error",
+				"code":    "json_invalid",
+			},
+		}
+
+		// 保存错误请求记录
+		request := &storage.Request{
+			ID:        uuid.New().String(),
+			UserID:    userID,
+			Method:    "POST",
+			Path:      "/v1/completions",
+			Timestamp: time.Now(),
+			Headers:   map[string]string{"Content-Type": "application/json"},
+			Query:     map[string]string{},
+			Body:      string(bodyBytes),
+			ClientIP:  utils.GetClientIP(c.Request),
+			Metadata: map[string]interface{}{
+				"source":    "completions_handler",
+				"user_id":   userID,
+				"username":  username,
+				"error":     "invalid_json",
+				"error_msg": err.Error(),
+			},
+		}
+
+		h.SaveRequest(userID, request)
+
+		c.JSON(http.StatusBadRequest, errorResponse)
+		return
+	}
+
+	// 委托给通用处理器
+	h.HandleOpenAIRequest(c)
+}
+
+// HandleModels 处理模型列表请求
+func (h *Handler) HandleModels(c *gin.Context) {
+	// 获取用户信息
+	userID, username := h.getUserFromContext(c)
+
+	// 模型列表请求通常没有请求体，直接委托给通用处理器
+	// 添加用户信息到上下文中
+	c.Set("user_id", userID)
+	c.Set("username", username)
+
+	h.HandleOpenAIRequest(c)
+}
+
+// HandleModelDetails 处理单个模型详情请求
+func (h *Handler) HandleModelDetails(c *gin.Context) {
+	// 获取用户信息
+	userID, username := h.getUserFromContext(c)
+
+	// 模型详情请求通常没有请求体，直接委托给通用处理器
+	// 添加用户信息到上下文中
+	c.Set("user_id", userID)
+	c.Set("username", username)
+
+	h.HandleOpenAIRequest(c)
+}
+
+// 添加请求和响应的数据结构定义
+
+// ChatCompletionRequest 聊天完成请求结构
+type ChatCompletionRequest struct {
+	Model            string                 `json:"model"`
+	Messages         []ChatMessage          `json:"messages"`
+	Temperature      *float64               `json:"temperature,omitempty"`
+	TopP             *float64               `json:"top_p,omitempty"`
+	N                *int                   `json:"n,omitempty"`
+	Stream           *bool                  `json:"stream,omitempty"`
+	Stop             interface{}            `json:"stop,omitempty"`
+	MaxTokens        *int                   `json:"max_tokens,omitempty"`
+	PresencePenalty  *float64               `json:"presence_penalty,omitempty"`
+	FrequencyPenalty *float64               `json:"frequency_penalty,omitempty"`
+	LogitBias        map[string]interface{} `json:"logit_bias,omitempty"`
+	User             *string                `json:"user,omitempty"`
+}
+
+// ChatMessage 聊天消息结构
+type ChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+	Name    string `json:"name,omitempty"`
+}
+
+// EmbeddingRequest 嵌入请求结构
+type EmbeddingRequest struct {
+	Input          interface{} `json:"input"`
+	Model          string      `json:"model"`
+	EncodingFormat *string     `json:"encoding_format,omitempty"`
+	User           *string     `json:"user,omitempty"`
+}
+
+// CompletionRequest 文本完成请求结构
+type CompletionRequest struct {
+	Model            string                 `json:"model"`
+	Prompt           interface{}            `json:"prompt"`
+	Suffix           *string                `json:"suffix,omitempty"`
+	MaxTokens        *int                   `json:"max_tokens,omitempty"`
+	Temperature      *float64               `json:"temperature,omitempty"`
+	TopP             *float64               `json:"top_p,omitempty"`
+	N                *int                   `json:"n,omitempty"`
+	Stream           *bool                  `json:"stream,omitempty"`
+	Logprobs         *int                   `json:"logprobs,omitempty"`
+	Echo             *bool                  `json:"echo,omitempty"`
+	Stop             interface{}            `json:"stop,omitempty"`
+	PresencePenalty  *float64               `json:"presence_penalty,omitempty"`
+	FrequencyPenalty *float64               `json:"frequency_penalty,omitempty"`
+	BestOf           *int                   `json:"best_of,omitempty"`
+	LogitBias        map[string]interface{} `json:"logit_bias,omitempty"`
+	User             *string                `json:"user,omitempty"`
 }

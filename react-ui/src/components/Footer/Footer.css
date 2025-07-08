@@ -1,17 +1,122 @@
+/* 页脚样式 - 朴素简洁设计 */
 .footer {
+  background: #f8f9fa;
+  color: #7f8c8d;
+  padding: 20px 0;
+  margin-top: auto;
+  border-top: 1px solid #e9ecef;
+}
+
+.footer-content {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
   text-align: center;
-  padding: 12px 50px;
-  color: rgba(0, 0, 0, 0.45);
+}
+
+.footer-link {
+  color: #2c3e50;
+  text-decoration: none;
+  font-weight: 500;
   font-size: 14px;
-  background: #f0f2f5;
-  border-top: 1px solid #e8e8e8;
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.footer a {
-  color: rgba(0, 0, 0, 0.65);
-  transition: color 0.3s;
+.footer-link::before {
+  content: '🔗';
+  font-size: 12px;
 }
 
-.footer a:hover {
-  color: #1677ff;
+.footer-link:hover {
+  color: #3498db;
+}
+
+.footer-divider {
+  color: #bdc3c7;
+  font-size: 14px;
+  margin: 0 4px;
+}
+
+.footer-copyright {
+  color: #7f8c8d;
+  font-size: 14px;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.footer-copyright::before {
+  content: '©';
+  font-size: 14px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .footer {
+    padding: 16px 0;
+  }
+  
+  .footer-content {
+    padding: 0 16px;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .footer-link {
+    font-size: 13px;
+  }
+  
+  .footer-copyright {
+    font-size: 13px;
+  }
+  
+  .footer-divider {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .footer-content {
+    padding: 0 12px;
+  }
+  
+  .footer-link {
+    font-size: 12px;
+  }
+  
+  .footer-copyright {
+    font-size: 12px;
+  }
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+  .footer {
+    background: #000;
+    border-top: 2px solid #fff;
+  }
+  
+  .footer-link {
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+  
+  .footer-link:hover,
+  .footer-link:focus {
+    border-color: #fff;
+    background: #333;
+  }
+}
+
+/* 聚焦状态 */
+.footer-link:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.5);
+  outline-offset: 2px;
 } 

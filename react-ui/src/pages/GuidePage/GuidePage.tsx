@@ -1,48 +1,64 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Input,
+  Button,
+  Card,
+  Typography,
+  Space,
+  Row,
+  Col,
+  List,
+  Avatar,
+  Spin,
+  Alert
+} from 'antd';
+import { CopyOutlined, EyeOutlined, EyeInvisibleOutlined, UserOutlined } from '@ant-design/icons';
 import Layout from '../../components/Layout/Layout';
-import './GuidePage.css';
+import { useNotification } from '../../components/Notification';
+
+const { Title, Paragraph, Text } = Typography;
 
 const GuidePage: React.FC = () => {
   const [showToken, setShowToken] = useState(false);
-  // 使用正确的后端服务器地址和端口
-  const backendUrl = window.location.hostname === 'localhost' ? 
-    'http://localhost:8080' : window.location.origin;
-  const apiUrl = '/v1';
-  const fullApiUrl = backendUrl + apiUrl; // 完整的API地址，包括/v1路径
-  const [token, setToken] = useState('Bearer mt-mitm-server-token'); // 默认值
-
-  // 对话状态
+  const [backendUrl, setBackendUrl] = useState('');
+  const [fullApiUrl, setFullApiUrl] = useState('');
+  const [token, setToken] = useState('');
   const [messages, setMessages] = useState<Array<{role: string, content: string}>>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { addNotification } = useNotification();
 
-  // 获取有效token
   useEffect(() => {
+    const origin = window.location.origin;
+    setBackendUrl(origin);
+    setFullApiUrl(`${origin}/v1`);
+
     const fetchToken = async () => {
       try {
-        // 从后端获取真实token
-        const response = await fetch(`${backendUrl}/ui/api/token`);
+        const response = await fetch(`${origin}/ui/api/token`);
         const data = await response.json();
-        if (data.code === 0 && data.data && data.data.token) {
+        if (data.code === 0 && data.data?.token) {
           setToken(`Bearer ${data.data.token}`);
         }
       } catch (error) {
-        console.error('获取token失败:', error);
+        addNotification('获取认证Token失败', 'danger');
       }
     };
-
     fetchToken();
-  }, [backendUrl]);
+  }, [addNotification]);
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      addNotification('已复制到剪贴板', 'success');
+    } catch (error) {
+      addNotification('复制失败', 'danger');
+    }
   };
 
-  // 发送消息到MITM OpenAI Server
   const sendMessage = async () => {
     if (!inputMessage.trim()) return;
     
-    // 添加用户消息到历史
     const userMessage = { role: 'user', content: inputMessage };
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
@@ -50,198 +66,96 @@ const GuidePage: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // 构建请求数据，完全符合OpenAI API规范
-      const requestData = {
-        model: 'gpt-3.5-turbo',
-        messages: updatedMessages,
-        temperature: 0.7
-      };
-      
-      // 直接使用OpenAI API路径
+      const requestData = { model: 'gpt-3.5-turbo', messages: updatedMessages, temperature: 0.7 };
       const response = await fetch(`${backendUrl}/v1/chat/completions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': token
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': token },
         body: JSON.stringify(requestData)
       });
       
-      if (!response.ok) {
-        throw new Error(`请求失败: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`请求失败: ${response.status}`);
       
       const data = await response.json();
-      
-      // 添加助手响应到历史，处理标准OpenAI API响应格式
-      if (data.choices && data.choices.length > 0) {
-        const assistantMessage = data.choices[0].message;
-        setMessages([...updatedMessages, assistantMessage]);
+      if (data.choices?.[0]?.message) {
+        setMessages([...updatedMessages, data.choices[0].message]);
       }
     } catch (error) {
-      console.error('请求OpenAI API失败:', error);
-      // 添加错误消息
-      setMessages([
-        ...updatedMessages, 
-        { 
-          role: 'assistant', 
-          content: `发生错误: ${error instanceof Error ? error.message : '未知错误'}`
-        }
-      ]);
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      setMessages([...updatedMessages, { role: 'assistant', content: `发生错误: ${errorMessage}` }]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 处理按回车键发送
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+  const CodeBlock: React.FC<{text: string}> = ({ text }) => (
+    <div style={{ position: 'relative', backgroundColor: '#282c34', padding: '16px', borderRadius: 8, color: 'white', fontFamily: 'monospace' }}>
+      <code>{text}</code>
+      <Button icon={<CopyOutlined />} onClick={() => copyToClipboard(text)} style={{ position: 'absolute', top: 8, right: 8 }} />
+    </div>
+  );
 
   return (
     <Layout title="OpenAI API配置教程">
-      <div className="simple-guide-container">
-        <div className="guide-card">
-          <h2>OpenAI API配置指南</h2>
-          <p className="guide-description">
-            要使用此中间人服务器，您需要将OpenAI客户端配置为使用以下API地址和认证Token。
-            这样您的所有API请求将通过此服务器，并被记录下来供后续分析。
-          </p>
-
-          <div className="config-section">
-            <h3>1. API地址</h3>
-            <div className="config-item">
-              <div className="input-with-copy">
-                <input 
-                  type="text" 
-                  value={fullApiUrl} 
-                  readOnly 
-                  className="config-input"
-                />
-                <button 
-                  className="copy-button"
-                  onClick={() => copyToClipboard(fullApiUrl)}
-                  title="复制到剪贴板"
-                >
-                  复制
-                </button>
-              </div>
-              <p className="config-hint">在您的OpenAI客户端中，将baseURL设置为上述地址</p>
-            </div>
-          </div>
-
-          <div className="config-section">
-            <h3>2. 认证Token</h3>
-            <div className="config-item">
-              <div className="input-with-copy">
-                <input 
-                  type={showToken ? "text" : "password"}
-                  value={token} 
-                  readOnly 
-                  className="config-input"
-                />
-                <button 
-                  className="button-secondary"
-                  onClick={() => setShowToken(!showToken)}
-                >
-                  {showToken ? "隐藏" : "显示"}
-                </button>
-                <button 
-                  className="copy-button"
-                  onClick={() => copyToClipboard(token)}
-                  title="复制到剪贴板"
-                >
-                  复制
-                </button>
-              </div>
-              <p className="config-hint">在您的OpenAI客户端中，使用此Token作为API密钥</p>
-            </div>
-          </div>
-
-          {/* 添加测试提示信息 */}
-          <div className="config-section">
-            <h3>3. 验证API连接</h3>
-            <div className="config-item">
-              <p className="config-hint">您可以使用以下命令测试API连接：</p>
-              <div className="code-block">
-                <code>
-                  curl -X GET {fullApiUrl}/models -H "Authorization: {token}"
-                </code>
-                <button 
-                  className="copy-button"
-                  onClick={() => copyToClipboard(`curl -X GET ${fullApiUrl}/models -H "Authorization: ${token}"`)}
-                  title="复制到剪贴板"
-                >
-                  复制
-                </button>
-              </div>
-              <p className="config-hint">或使用下方的测试对话框直接测试聊天功能</p>
-            </div>
-          </div>
-
-          {/* 测试对话框 */}
-          <div className="chat-test-section">
-            <h3>测试对话</h3>
-            <p className="chat-description">
-              在下方与MITM OpenAI Server进行对话测试，验证服务器是否正常工作。
-            </p>
-            
-            <div className="chat-container">
-              <div className="messages-container">
-                {messages.length === 0 ? (
-                  <div className="empty-chat">
-                    <p>开始与AI助手对话吧</p>
-                  </div>
-                ) : (
-                  messages.map((msg, index) => (
-                    <div 
-                      key={index} 
-                      className={`message ${msg.role === 'user' ? 'user-message' : 'assistant-message'}`}
-                    >
-                      <div className="message-role">{msg.role === 'user' ? '用户' : 'AI助手'}</div>
-                      <div className="message-content">{msg.content}</div>
-                    </div>
-                  ))
-                )}
-                {isLoading && (
-                  <div className="message assistant-message loading">
-                    <div className="message-role">AI助手</div>
-                    <div className="message-content">
-                      <div className="typing-indicator">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-        </div>
-        
-              <div className="chat-input-container">
-                <textarea 
-                  className="chat-input"
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="输入消息..."
-                  disabled={isLoading}
-                  rows={2}
-                />
-                <button 
-                  className="send-button"
-                  onClick={sendMessage}
-                  disabled={isLoading || !inputMessage.trim()}
-                >
-                  {isLoading ? '发送中...' : '发送'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Title level={2}>OpenAI API配置指南</Title>
+      <Paragraph>要使用此中间人服务器，您需要将OpenAI客户端配置为使用以下API地址和认证Token。这样您的所有API请求将通过此服务器，并被记录下来供后续分析。</Paragraph>
+      
+      <Row gutter={[16, 24]}>
+        <Col span={24}>
+          <Card title="1. API地址">
+            <Input value={fullApiUrl} readOnly addonAfter={<Button icon={<CopyOutlined />} onClick={() => copyToClipboard(fullApiUrl)} />} />
+            <Text type="secondary" style={{ marginTop: 8, display: 'block' }}>在您的OpenAI客户端中，将baseURL设置为上述地址。</Text>
+          </Card>
+        </Col>
+        <Col span={24}>
+          <Card title="2. 认证Token">
+            <Input 
+              value={token} 
+              readOnly 
+              type={showToken ? 'text' : 'password'}
+              addonAfter={
+                <Space>
+                  <Button icon={showToken ? <EyeInvisibleOutlined /> : <EyeOutlined />} onClick={() => setShowToken(!showToken)} />
+                  <Button icon={<CopyOutlined />} onClick={() => copyToClipboard(token)} />
+                </Space>
+              }
+            />
+            <Text type="secondary" style={{ marginTop: 8, display: 'block' }}>在您的OpenAI客户端中，使用此Token作为API密钥。</Text>
+          </Card>
+        </Col>
+        <Col span={24}>
+          <Card title="3. 验证API连接">
+            <Paragraph>您可以使用以下命令测试API连接：</Paragraph>
+            <CodeBlock text={`curl -X GET ${fullApiUrl}/models -H "Authorization: ${token}"`} />
+          </Card>
+        </Col>
+        <Col span={24}>
+          <Card title="4. 测试对话">
+            <List
+              dataSource={messages}
+              renderItem={item => (
+                <List.Item>
+                  <List.Item.Meta
+                    avatar={item.role === 'user' ? <Avatar icon={<UserOutlined />} /> : <Avatar>AI</Avatar>}
+                    title={item.role === 'user' ? '你' : 'AI助手'}
+                    description={item.content}
+                  />
+                </List.Item>
+              )}
+              style={{ minHeight: 200, maxHeight: 400, overflowY: 'auto', marginBottom: 16, border: '1px solid #f0f0f0', padding: 16 }}
+            />
+            {isLoading && <Spin />}
+            <Input.TextArea 
+              rows={2}
+              value={inputMessage}
+              onChange={e => setInputMessage(e.target.value)}
+              placeholder="输入消息..."
+              disabled={isLoading}
+              onPressEnter={e => { if (!e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+            />
+            <Button type="primary" onClick={sendMessage} loading={isLoading} style={{ marginTop: 16 }}>发送</Button>
+          </Card>
+        </Col>
+      </Row>
     </Layout>
   );
 };

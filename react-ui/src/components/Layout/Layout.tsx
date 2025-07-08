@@ -1,10 +1,9 @@
 import React from 'react';
 import { Layout as AntLayout, theme } from 'antd';
-import Navbar from '../Navbar/Navbar';
+import Navbar from '../Navbar';
 import Footer from '../Footer';
-import './Layout.css';
 
-const { Header, Content } = AntLayout;
+const { Content, Footer: AntFooter } = AntLayout;
 
 const Layout: React.FC<{
   children: React.ReactNode;
@@ -24,23 +23,31 @@ const Layout: React.FC<{
   }, [title]);
 
   return (
-    <AntLayout className="layout" style={{ minHeight: '100vh' }}>
-      <Header style={{ padding: 0, backgroundColor: '#001529' }}>
+    <AntLayout>
       <Navbar />
-      </Header>
-      <Content style={{ padding: '0 50px', marginTop: 16 }}>
+      <Content style={{ 
+        padding: '0 48px', 
+        marginTop: 64, // 导航栏高度
+        minHeight: 'calc(100vh - 64px)' // 减去导航栏高度
+      }}>
         <div 
           style={{ 
             padding: 24, 
+            marginTop: 24,
             background: colorBgContainer, 
             borderRadius: borderRadiusLG,
-            minHeight: 280
+            minHeight: 'calc(100vh - 200px)'
           }}
         >
-        {children}
-      </div>
+          {children}
+        </div>
       </Content>
-      <Footer />
+      <AntFooter style={{ 
+        padding: 0,
+        backgroundColor: 'transparent'
+      }}>
+        <Footer />
+      </AntFooter>
     </AntLayout>
   );
 };

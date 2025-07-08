@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, Layout, Typography, Button, Space } from 'antd';
+import { Menu, Typography, Dropdown, Avatar, Button, Space } from 'antd';
 import { 
   HomeOutlined, 
   SettingOutlined, 
-  BookOutlined, 
+  BookOutlined,
   LogoutOutlined,
-  GithubOutlined
+  GithubOutlined,
+  UserOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
 import './Navbar.css';
 
-const { Header } = Layout;
 const { Title } = Typography;
 
 const Navbar: React.FC = () => {
@@ -66,41 +66,95 @@ const Navbar: React.FC = () => {
       icon: <SettingOutlined />,
       label: '系统设置',
       onClick: () => navigate('/settings')
-    },
+    }
+  ];
+
+  // 用户下拉菜单
+  const userMenuItems = [
     {
       key: 'logout',
       icon: <LogoutOutlined />,
       label: '退出登录',
       onClick: () => logout()
-    },
-    {
-      key: 'github',
-      icon: <GithubOutlined />,
-      label: <a 
-              href="https://github.com/llm-sec/mitm-openai-server" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-      >
-        GitHub
-      </a>,
     }
   ];
 
+  const renderUserSection = () => {
+    if (isAuthenticated) {
+      return (
+        <Space size={16}>
+          <a 
+            href="https://github.com/llm-sec/mitm-openai-server" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="navbar-link github-link"
+          >
+            <span className="navbar-icon"><GithubOutlined /></span>
+            <span>GitHub</span>
+          </a>
+          <Dropdown 
+            menu={{ items: userMenuItems }} 
+            placement="bottomRight"
+            trigger={['click']}
+          >
+            <Avatar
+              className="user-avatar"
+              icon={<UserOutlined />}
+              style={{ 
+                cursor: 'pointer',
+                backgroundColor: '#1890ff'
+              }}
+            />
+          </Dropdown>
+        </Space>
+      );
+    }
+
+    return (
+      <Space size={8}>
+        <Button type="text" onClick={() => navigate('/login')} className="auth-button">
+          登录
+        </Button>
+        <Button type="primary" onClick={() => navigate('/register')} className="auth-button">
+          注册
+        </Button>
+        <a 
+          href="https://github.com/llm-sec/mitm-openai-server" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="navbar-link github-link"
+        >
+          <span className="navbar-icon"><GithubOutlined /></span>
+          <span>GitHub</span>
+        </a>
+      </Space>
+    );
+  };
+
   return (
-    <div className="navbar-container">
-      <div className="logo">
-        <Link to="/">
-          <Title level={4} style={{ margin: 0, color: 'white' }}>中间人OpenAI API服务器</Title>
+    <nav className="navbar">
+      <div className="navbar-content">
+        <Link to="/" className="navbar-brand">
+          <Title level={4}>中间人OpenAI API服务器</Title>
         </Link>
+        <div className="navbar-right">
+          <ul className="navbar-menu">
+            {menuItems.map(item => (
+              <li key={item.key} className="navbar-item">
+                <a
+                  className={`navbar-link ${current === item.key ? 'active' : ''}`}
+                  onClick={item.onClick}
+                >
+                  <span className="navbar-icon">{item.icon}</span>
+                  <span>{item.label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+          {renderUserSection()}
+        </div>
       </div>
-      <Menu 
-        theme="dark"
-        mode="horizontal"
-        selectedKeys={[current]}
-        items={menuItems}
-        style={{ flex: 1, minWidth: 600, justifyContent: 'flex-end' }}
-      />
-    </div>
+    </nav>
   );
 };
 

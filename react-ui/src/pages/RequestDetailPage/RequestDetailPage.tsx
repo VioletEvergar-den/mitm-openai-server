@@ -1,7 +1,6 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import './styles'; // 导入所有样式
-import { Tabs, Divider, Card } from 'antd';
+import { Tabs, Divider, Card, Space } from 'antd';
 import Layout from '../../components/Layout';
 import {
   RequestHeader,
@@ -25,6 +24,7 @@ const { TabPane } = Tabs;
 const RequestDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("1");
   
   // 使用自定义Hook获取请求数据
   const { request, loading, error, prevRequestId, nextRequestId } = useRequestDetail(id);
@@ -76,7 +76,7 @@ const RequestDetailPage: React.FC = () => {
 
   return (
     <Layout title="请求详情">
-      <div className="request-detail-container">
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Card>
           <RequestHeader
             method={request.method}
@@ -102,7 +102,7 @@ const RequestDetailPage: React.FC = () => {
           
           <Divider />
 
-          <Tabs defaultActiveKey="1">
+          <Tabs activeKey={activeTab} onChange={setActiveTab}>
             <TabPane tab="请求" key="1">
               <RequestContent
                 requestHeaders={request.requestHeaders}
@@ -123,7 +123,7 @@ const RequestDetailPage: React.FC = () => {
             </TabPane>
           </Tabs>
         </Card>
-      </div>
+      </Space>
     </Layout>
   );
 };

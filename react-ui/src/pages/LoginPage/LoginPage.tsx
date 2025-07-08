@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { utils } from '../../services/api';
 import { 
@@ -10,9 +10,10 @@ import {
   Card, 
   Typography, 
   Alert, 
-  Space, 
   Layout,
-  Tooltip
+  Row,
+  Col,
+  Space
 } from 'antd';
 import { 
   UserOutlined, 
@@ -24,10 +25,8 @@ import {
   SafetyOutlined
 } from '@ant-design/icons';
 import Footer from '../../components/Footer';
-import './LoginPage.css';
 
 const { Title, Paragraph, Link, Text } = Typography;
-const { Content } = Layout;
 
 const LoginPage: React.FC = () => {
   const [form] = Form.useForm();
@@ -80,13 +79,17 @@ const LoginPage: React.FC = () => {
       // 添加控制台调试输出
       console.log('登录响应数据:', data);
       console.log('登录响应状态:', response.status);
-      console.log('token是否存在:', !!data.token);
-      if (data.token) {
-        console.log('token长度:', data.token.length);
-        console.log('token前10个字符:', data.token.substring(0, 10));
+      console.log('data.data 完整内容:', data.data);
+      console.log('data.data 类型:', typeof data.data);
+      console.log('token是否存在:', !!data.data?.token);
+      if (data.data?.token) {
+        console.log('token长度:', data.data.token.length);
+        console.log('token前10个字符:', data.data.token.substring(0, 10));
+      } else {
+        console.log('token不存在，data.data?.token 值:', data.data?.token);
       }
       
-      if (response.ok && data.status === 'success') {
+      if (response.ok && data.code === 0) {
         // 登录成功
         
         // 保存用户的"记住我"选择
@@ -103,8 +106,8 @@ const LoginPage: React.FC = () => {
         }
         
         // 保存后端返回的token，设置为一年有效期
-        if (data.token) {
-          utils.saveAuth(data.token, 365);
+        if (data.data?.token) {
+          utils.saveAuth(data.data.token, 365);
           login(username);
           console.log('已保存token到localStorage');
           console.log('保存的token:', localStorage.getItem('auth_token'));
@@ -113,7 +116,7 @@ const LoginPage: React.FC = () => {
           setError('服务器没有返回有效的认证令牌');
         }
       } else {
-        setError(data.message || '用户名或密码不正确');
+        setError(data.msg || '用户名或密码不正确');
       }
     } catch (err) {
       setError('登录失败，请稍后重试');
@@ -124,104 +127,111 @@ const LoginPage: React.FC = () => {
   };
   
   return (
-    <Layout className="login-layout">
-      <Content className="login-content">
-        <div className="login-container">
-          <div className="login-banner">
-            <Typography>
-              <Title level={2}>MITM OpenAI Server</Title>
-              <Paragraph>
-                安全监控与分析OpenAI API请求的强大工具
-                <br />
-                实时拦截、记录和检查AI交互的完整内容
-              </Paragraph>
-              
-              <Space direction="vertical" className="banner-links">
-                <Link 
-                  href="https://github.com/llm-sec/mitm-openai-server" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="github-link"
+    <Layout style={{ minHeight: '100vh', backgroundColor: '#f0f2f5' }}>
+      <Row justify="center" align="middle" style={{ minHeight: '100vh' }}>
+        <Col xs={22} sm={20} md={16} lg={12} xl={10}>
+          <Card style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)' }}>
+            <Row>
+              <Col xs={0} sm={0} md={10} style={{ 
+                backgroundColor: '#001529', 
+                color: 'white', 
+                padding: '48px 32px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center'
+              }}>
+                <Typography>
+                  <Title level={2} style={{ color: 'white' }}>MITM OpenAI Server</Title>
+                  <Paragraph style={{ color: 'rgba(255, 255, 255, 0.85)' }}>
+                    安全监控与分析OpenAI API请求的强大工具
+                  </Paragraph>
+                  <Paragraph style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
+                    实时拦截、记录和检查AI交互的完整内容
+                  </Paragraph>
+                  <Space direction="vertical" style={{ marginTop: 24 }}>
+                    <Link 
+                      href="https://github.com/llm-sec/mitm-openai-server" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      style={{ color: 'white' }}
+                    >
+                      <GithubOutlined /> GitHub 项目仓库
+                    </Link>
+                    <Text style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
+                      <SafetyOutlined /> 安全可靠的专业工具
+                    </Text>
+                  </Space>
+                </Typography>
+              </Col>
+              <Col xs={24} sm={24} md={14} style={{ padding: '48px 32px' }}>
+                <Title level={3} style={{ textAlign: 'center' }}>系统登录</Title>
+                {error && (
+                  <Alert
+                    message={error}
+                    type="error"
+                    showIcon
+                    style={{ marginBottom: 24 }}
+                  />
+                )}
+                <Form
+                  form={form}
+                  name="login"
+                  initialValues={{ remember: rememberMe }}
+                  onFinish={handleSubmit}
+                  layout="vertical"
+                  size="large"
                 >
-                  <GithubOutlined style={{ fontSize: '16px' }} /> GitHub 项目仓库
-                </Link>
-                
-                <Text type="secondary" style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.9rem', marginTop: '40px' }}>
-                  <SafetyOutlined style={{ marginRight: 8 }} /> 安全可靠的专业工具
-                </Text>
-              </Space>
-            </Typography>
-          </div>
-          
-          <Card 
-            className="login-card" 
-            bordered={false}
-            title={<Title level={3} style={{ textAlign: 'center', margin: 0, color: '#1e3c72' }}>系统登录</Title>}
-          >
-            {error && (
-              <Alert
-                message={error}
-                type="error"
-                showIcon
-                style={{ marginBottom: 24 }}
-              />
-            )}
-            
-            <Form
-              form={form}
-              name="login"
-              initialValues={{ remember: rememberMe }}
-              onFinish={handleSubmit}
-              layout="vertical"
-              size="large"
-            >
-              <Form.Item
-                name="username"
-                label="用户名"
-                rules={[{ required: true, message: '请输入用户名' }]}
-              >
-                <Input 
-                  prefix={<UserOutlined style={{ color: '#1e3c72' }} />} 
-                  placeholder="请输入用户名" 
-                  autoComplete="username"
-                  disabled={loading}
-                />
-              </Form.Item>
-              
-              <Form.Item
-                name="password"
-                label="密码"
-                rules={[{ required: true, message: '请输入密码' }]}
-              >
-                <Input.Password
-                  prefix={<LockOutlined style={{ color: '#1e3c72' }} />}
-                  placeholder="请输入密码"
-                  autoComplete="current-password"
-                  disabled={loading}
-                  iconRender={(visible) => (visible ? <EyeTwoTone twoToneColor="#1e3c72" /> : <EyeInvisibleOutlined />)}
-                />
-              </Form.Item>
-              
-              <Form.Item name="remember" valuePropName="checked">
-                <Checkbox disabled={loading}>记住登录信息</Checkbox>
-              </Form.Item>
-              
-              <Form.Item>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={loading}
-                  block
-                  icon={<LoginOutlined />}
-                  className="login-form-button"
-                >
-                  {loading ? '登录中...' : '登录系统'}
-                </Button>
-              </Form.Item>
-            </Form>
+                  <Form.Item
+                    name="username"
+                    rules={[{ required: true, message: '请输入用户名' }]}
+                  >
+                    <Input 
+                      prefix={<UserOutlined />} 
+                      placeholder="用户名" 
+                      autoComplete="username"
+                      disabled={loading}
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    name="password"
+                    rules={[{ required: true, message: '请输入密码' }]}
+                  >
+                    <Input.Password
+                      prefix={<LockOutlined />}
+                      placeholder="密码"
+                      autoComplete="current-password"
+                      disabled={loading}
+                      iconRender={(visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
+                    />
+                  </Form.Item>
+                  <Form.Item>
+                    <Form.Item name="remember" valuePropName="checked" noStyle>
+                      <Checkbox disabled={loading}>记住我</Checkbox>
+                    </Form.Item>
+                    <RouterLink to="/forgot-password" style={{ float: 'right' }}>
+                      忘记密码
+                    </RouterLink>
+                  </Form.Item>
+                  <Form.Item>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={loading}
+                      block
+                      icon={<LoginOutlined />}
+                    >
+                      {loading ? '登录中...' : '登录'}
+                    </Button>
+                  </Form.Item>
+                  <Text style={{ textAlign: 'center', display: 'block' }}>
+                    还没有账号？ <RouterLink to="/register">立即注册</RouterLink>
+                  </Text>
+                </Form>
+              </Col>
+            </Row>
           </Card>
-        </div>
-      </Content>
+        </Col>
+      </Row>
       <Footer />
     </Layout>
   );

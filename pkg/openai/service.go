@@ -41,13 +41,14 @@ func InitGlobalHandler(storage storage.Storage, service Service) {
 // SaveRequest 全局函数，用于保存请求记录
 // 这个函数可以从包外部调用，而不需要直接访问处理器实例
 // 参数:
+//   - userID: 用户ID
 //   - request: 要保存的请求记录
 //
 // 返回:
 //   - error: 如果保存失败，返回错误信息
-func SaveRequest(request *storage.Request) error {
+func SaveRequest(userID int64, request *storage.Request) error {
 	if globalHandler == nil {
 		return nil // 如果全局处理器未初始化，静默忽略
 	}
-	return globalHandler.SaveRequest(request)
+	return globalHandler.SaveRequest(userID, request)
 }

@@ -1,10 +1,9 @@
 import React from 'react';
-import { Space, Tag, Button, Tooltip, Typography } from 'antd';
+import { Space, Tag, Button, Tooltip, Typography, Row, Col } from 'antd';
 import { ArrowLeftOutlined, ArrowRightOutlined, DeleteOutlined } from '@ant-design/icons';
-import './RequestHeader.css';
 import ExportButton from './ExportButton';
 
-const { Text } = Typography;
+const { Title } = Typography;
 
 interface RequestHeaderProps {
   method: string;
@@ -32,25 +31,23 @@ const RequestHeader: React.FC<RequestHeaderProps> = ({
   requestId
 }) => {
   return (
-    <div className="detail-header">
-      <div className="detail-title">
-        <Space>
-          <Tag color={getMethodColor(method)}>{method}</Tag>
-          <Text ellipsis style={{ maxWidth: '500px' }}>
+    <Row justify="space-between" align="middle">
+      <Col>
+        <Space align="center">
+          <Tag color={getMethodColor(method)} style={{ fontSize: 16, padding: '4px 8px' }}>{method}</Tag>
+          <Title level={4} ellipsis={{ tooltip: path }} style={{ margin: 0 }}>
             {path}
-          </Text>
+          </Title>
         </Space>
-      </div>
-      <div className="detail-actions">
-        <Space>
-          <Space className="navigation-buttons">
+      </Col>
+      <Col>
+        <Space size="middle">
+          <Space.Compact>
             <Tooltip title={prevRequestId ? "查看上一个请求" : "没有上一个请求"}>
               <Button 
                 icon={<ArrowLeftOutlined />} 
                 onClick={navigateToPrevious}
                 disabled={!prevRequestId}
-                type="text"
-                className="nav-icon"
               />
             </Tooltip>
             <Tooltip title={nextRequestId ? "查看下一个请求" : "没有下一个请求"}>
@@ -58,25 +55,20 @@ const RequestHeader: React.FC<RequestHeaderProps> = ({
                 icon={<ArrowRightOutlined />} 
                 onClick={navigateToNext}
                 disabled={!nextRequestId}
-                type="text"
-                className="nav-icon"
               />
             </Tooltip>
-            <Tooltip title="删除此请求">
-              <Button 
-                icon={<DeleteOutlined />} 
-                onClick={handleDelete}
-                danger
-                type="text"
-                className="nav-icon"
-              />
-            </Tooltip>
-          </Space>
-          
+          </Space.Compact>
+          <Tooltip title="删除此请求">
+            <Button 
+              icon={<DeleteOutlined />} 
+              onClick={handleDelete}
+              danger
+            />
+          </Tooltip>
           <ExportButton data={requestData} requestId={requestId} />
         </Space>
-      </div>
-    </div>
+      </Col>
+    </Row>
   );
 };
 

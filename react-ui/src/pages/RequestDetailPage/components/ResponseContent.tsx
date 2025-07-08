@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
+import { Space } from 'antd';
 import JsonCardView from './JsonCardView';
-import './ResponseContent.css';
 
 interface ResponseContentProps {
   responseHeaders: any;
@@ -49,7 +49,7 @@ const ResponseContent: React.FC<ResponseContentProps> = ({
   }, [responseBody]);
 
   return (
-    <div className="response-content">
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <JsonCardView
         title="响应头"
         data={formattedHeaders}
@@ -62,11 +62,10 @@ const ResponseContent: React.FC<ResponseContentProps> = ({
           title="响应体"
           data={formattedBody}
           copyToClipboard={copyToClipboard}
-          style={{ marginTop: 16 }}
           jsonPrettyTheme={jsonPrettyTheme}
         />
       )}
-    </div>
+    </Space>
   );
 };
 

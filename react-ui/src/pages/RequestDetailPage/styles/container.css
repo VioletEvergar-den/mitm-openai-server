@@ -1,6 +1,9 @@
 /* 请求详情容器样式 */
 .request-detail-container {
   width: 100%;
+  /* 突破Layout组件的padding限制 */
+  margin: -24px -24px 0 -24px;
+  padding: 24px;
 }
 
 /* 请求详情卡片 */
@@ -23,4 +26,28 @@
   flex-direction: column;
   align-items: stretch;
   width: 100%;
+}
+
+/* 响应内容区域 - 使用更宽的布局 */
+.response-full-width {
+  width: calc(100vw - 100px);  /* 减去Content的左右padding */
+  margin-left: -24px;  /* 抵消卡片的padding */
+  margin-right: -24px;
+  padding: 0 24px;
+  max-width: none;
+}
+
+/* 响应头和响应体特殊样式 */
+.response-section.full-width {
+  width: 100%;
+  margin-left: -24px;
+  margin-right: -24px;
+  padding: 0 24px;
+  background: #fafafa;
+  border-radius: 0;
+}
+
+.response-section.full-width .response-data-container {
+  width: 100%;
+  max-width: none;
 } 

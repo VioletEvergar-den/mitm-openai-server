@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, theme } from 'antd';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import RequestsPage from './pages/RequestsPage';
 import RequestDetailPage from './pages/RequestDetailPage';
 import SettingsPage from './pages/SettingsPage';
@@ -65,9 +66,10 @@ const App: React.FC = () => {
     <ConfigProvider theme={themeConfig}>
     <AuthProvider>
       <NotificationProvider>
-        <Router>
+        <Router basename="/ui">
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             
             <Route path="/" element={
               <ProtectedRoute>

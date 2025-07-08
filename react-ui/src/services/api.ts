@@ -59,7 +59,7 @@ API.interceptors.response.use(
       if (error.response.status === 401) {
         console.warn('收到401未授权响应，即将清除token并重定向到登录页');
         localStorage.removeItem('auth_token');
-        window.location.href = '/login';
+        window.location.href = '/ui/login';
       }
     } else if (error.request) {
       console.error('没有收到响应:', error.request);

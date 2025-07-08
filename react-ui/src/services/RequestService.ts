@@ -1,7 +1,5 @@
 import { RequestRecord } from '../types/RequestRecord';
-
-// API基础URL
-const API_BASE_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8080';
+import { apiService } from './api';
 
 export class RequestService {
   /**
@@ -9,12 +7,8 @@ export class RequestService {
    */
   static async getRequests(): Promise<RequestRecord[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/ui/api/requests`);
-      if (!response.ok) {
-        throw new Error(`获取请求记录失败: ${response.status}`);
-      }
-      const data = await response.json();
-      return data.data.requests || [];
+      const result = await apiService.getRequests();
+      return result as any;
     } catch (error) {
       console.error('获取请求记录时出错:', error);
       throw error;
@@ -26,12 +20,8 @@ export class RequestService {
    */
   static async getRequestById(id: string): Promise<RequestRecord> {
     try {
-      const response = await fetch(`${API_BASE_URL}/ui/api/requests/${id}`);
-      if (!response.ok) {
-        throw new Error(`获取请求记录详情失败: ${response.status}`);
-      }
-      const data = await response.json();
-      return data.data || {};
+      const result = await apiService.getRequestById(id);
+      return result as any;
     } catch (error) {
       console.error('获取请求记录详情时出错:', error);
       throw error;
@@ -43,12 +33,7 @@ export class RequestService {
    */
   static async deleteAllRequests(): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/ui/api/requests`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) {
-        throw new Error(`删除所有请求记录失败: ${response.status}`);
-      }
+      await apiService.clearAllRequests();
     } catch (error) {
       console.error('删除所有请求记录时出错:', error);
       throw error;

@@ -3,7 +3,6 @@ import { Card, Button, Tooltip, Typography } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
 import JSONPretty from 'react-json-pretty';
 import 'react-json-pretty/themes/monikai.css';
-import './JsonCardView.css';
 
 const { Text } = Typography;
 
@@ -57,10 +56,10 @@ const JsonCardView: React.FC<JsonCardViewProps> = ({
       title={title}
       style={style}
       extra={renderCardExtra()}
-      className="json-card-view"
+      styles={{ body: { padding: 0 } }}
     >
       {hasData ? (
-        <div className="json-viewer">
+        <div style={{ backgroundColor: '#272822', borderRadius: '0 0 6px 6px', overflow: 'hidden' }}>
           <JSONPretty 
             id={`json-pretty-${title.replace(/\s+/g, '-').toLowerCase()}`}
             data={processedData}
@@ -69,7 +68,9 @@ const JsonCardView: React.FC<JsonCardViewProps> = ({
           />
         </div>
       ) : (
-        <Text type="secondary">无数据</Text>
+        <div style={{ padding: '16px 24px' }}>
+          <Text type="secondary">无数据</Text>
+        </div>
       )}
     </Card>
   );

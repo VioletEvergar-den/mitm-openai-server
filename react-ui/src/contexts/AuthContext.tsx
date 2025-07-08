@@ -33,7 +33,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const logout = () => {
     utils.clearAuth();
     setAuthState({ isAuthenticated: false });
-    window.location.href = '/login';
+    window.location.href = '/ui/login';
   };
 
   // 初始化时检查认证状态

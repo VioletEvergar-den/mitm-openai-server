@@ -11,7 +11,10 @@ import {
   Tooltip,
   Switch,
   InputNumber,
-  Modal
+  Modal,
+  Row,
+  Col,
+  Typography
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -24,7 +27,8 @@ import {
 import { RequestRecord } from '../../types/RequestRecord';
 import { RequestService } from '../../services/RequestService';
 import Layout from '../../components/Layout/Layout';
-import './RequestsPage.css';
+
+const { Title } = Typography;
 
 // 从localStorage获取页面大小设置，默认为10
 const getStoredPageSize = (): number => {
@@ -357,50 +361,56 @@ const RequestsPage: React.FC = () => {
 
   return (
     <Layout title="请求列表">
-      <div className="requests-page">
-        <div className="requests-header">
-          <h1 className="requests-title">请求列表</h1>
-          <div className="requests-controls">
-            <Button
-              type="primary"
-              icon={<ReloadOutlined />}
-              loading={loading}
-              onClick={loadRequests}
-            >
-              刷新
-            </Button>
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              onClick={handleDeleteAll}
-            >
-              清空
-            </Button>
-          </div>
-        </div>
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Row justify="space-between" align="middle">
+          <Col>
+            <Title level={2}>请求列表</Title>
+          </Col>
+          <Col>
+            <Space>
+              <Button
+                type="primary"
+                icon={<ReloadOutlined />}
+                loading={loading}
+                onClick={loadRequests}
+              >
+                刷新
+              </Button>
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                onClick={handleDeleteAll}
+              >
+                清空
+              </Button>
+            </Space>
+          </Col>
+        </Row>
 
-        <div className="table-header">
-          <Space>
-            <Switch
-              checkedChildren="自动刷新"
-              unCheckedChildren="自动刷新"
-              checked={autoRefresh}
-              onChange={handleAutoRefreshChange}
-            />
-            {autoRefresh && (
-              <Space className="refresh-interval-input">
-                <ClockCircleOutlined />
-                <InputNumber
-                  min={1}
-                  max={60}
-                  value={refreshInterval}
-                  onChange={handleRefreshIntervalChange}
-                  addonAfter="秒"
-                />
-              </Space>
-            )}
-          </Space>
-        </div>
+        <Row justify="end">
+          <Col>
+            <Space>
+              <Switch
+                checkedChildren="自动刷新"
+                unCheckedChildren="自动刷新"
+                checked={autoRefresh}
+                onChange={handleAutoRefreshChange}
+              />
+              {autoRefresh && (
+                <Space>
+                  <ClockCircleOutlined />
+                  <InputNumber
+                    min={1}
+                    max={60}
+                    value={refreshInterval}
+                    onChange={handleRefreshIntervalChange}
+                    addonAfter="秒"
+                  />
+                </Space>
+              )}
+            </Space>
+          </Col>
+        </Row>
 
         <Table
           columns={columns}
@@ -416,13 +426,12 @@ const RequestsPage: React.FC = () => {
           loading={loading}
           onRow={(record) => ({
             onClick: () => navigate(`/requests/${record.id}`),
-            className: 'request-item',
+            style: { cursor: 'pointer' }
           })}
           showSorterTooltip={false}
-          className="hide-sorter-icons"
           tableLayout="fixed"
         />
-      </div>
+      </Space>
     </Layout>
   );
 };

@@ -1,97 +1,236 @@
-/* 导航栏样式 */
+/* 导航栏基础样式 */
 .navbar {
-  background-color: #343a40;
-  color: white;
-  padding: 15px 0;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  background: #001529;
+  padding: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
-.navbar-container {
+.navbar-content {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0;
   display: flex;
   align-items: center;
-  padding: 0 24px;
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-}
-
-.logo {
-  margin-right: 20px;
-}
-
-.logo a {
-  text-decoration: none;
+  height: 64px;
+  position: relative;
 }
 
 .navbar-brand {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: white;
   text-decoration: none;
+  padding-left: 24px;
+}
+
+.navbar-brand h4 {
+  color: #fff !important;
+  margin: 0 !important;
+  font-size: 18px !important;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  position: absolute;
+  right: 0;
+  height: 100%;
+  padding-right: 24px;
+  background: #001529;
 }
 
 .navbar-menu {
   display: flex;
-  list-style: none;
   align-items: center;
+  list-style: none;
   margin: 0;
   padding: 0;
+  gap: 4px;
+  margin-left: 48px;
 }
 
 .navbar-item {
-  margin-left: 20px;
+  position: relative;
 }
 
 .navbar-link {
-  color: rgba(255, 255, 255, 0.85);
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.3s;
-}
-
-.navbar-link:hover, 
-.navbar-link.active {
-  color: white;
-}
-
-/* GitHub图标样式 */
-.github-link {
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: transform 0.3s ease;
+  gap: 8px;
+  padding: 0 20px;
+  color: rgba(255, 255, 255, 0.65);
+  text-decoration: none;
+  font-size: 14px;
+  height: 64px;
+  line-height: 64px;
+  cursor: pointer;
+  transition: color 0.3s, background-color 0.3s;
+}
+
+.navbar-link:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.navbar-link.active {
+  color: #fff;
+  background: #1890ff;
+}
+
+.navbar-icon {
+  display: flex;
+  align-items: center;
+}
+
+/* GitHub 链接特殊样式 */
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  color: #fff;
+  background: #24292e;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease-in-out;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .github-link:hover {
-  transform: scale(1.15);
+  background: #2f363d;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.github-link svg {
-  fill: rgba(255, 255, 255, 0.85);
+.github-link:active {
+  transform: translateY(0);
 }
 
-.github-link:hover svg {
-  fill: white;
+.github-link .navbar-icon {
+  margin-right: 6px;
+  font-size: 16px;
 }
 
-/* 移动设备响应式 */
+/* 用户头像样式 */
+.user-avatar {
+  transition: transform 0.2s;
+}
+
+.user-avatar:hover {
+  transform: scale(1.1);
+}
+
+/* 认证按钮样式 */
+.auth-button {
+  height: 32px;
+  border-radius: 4px;
+}
+
+.auth-button[type="text"] {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.auth-button[type="text"]:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 响应式设计 */
 @media (max-width: 768px) {
-  .navbar-container {
-    padding: 0 10px;
+  .navbar-brand {
+    padding-left: 16px;
+  }
+
+  .navbar-brand h4 {
+    font-size: 16px !important;
   }
   
-  .logo {
-    font-size: 16px;
+  .navbar-link {
+    padding: 0 12px;
+  }
+  
+  .navbar-link span:not(.navbar-icon) {
+    display: none;
+  }
+  
+  .github-link {
+    padding: 0 8px;
   }
 
-  .navbar-menu {
-    margin-top: 15px;
-    flex-direction: column;
-    width: 100%;
+  .github-link .navbar-icon {
+    margin-right: 0;
   }
 
-  .navbar-item {
-    margin-left: 0;
-    margin-top: 10px;
+  .github-link span:not(.navbar-icon) {
+    display: none;
   }
+
+  .navbar-right {
+    gap: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-brand {
+    padding-left: 12px;
+  }
+
+  .navbar-brand h4 {
+    font-size: 14px !important;
+  }
+  
+  .navbar-link {
+    padding: 0 8px;
+  }
+  
+  .github-link {
+    padding: 0 6px;
+  }
+
+  .navbar-right {
+    gap: 8px;
+    padding-right: 12px;
+  }
+
+  .auth-button {
+    padding: 0 8px;
+  }
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+  .navbar {
+    background: #000;
+    border-bottom: 2px solid #fff;
+  }
+  
+  .navbar-link {
+    border: 1px solid transparent;
+  }
+  
+  .navbar-link:hover,
+  .navbar-link:focus {
+    border-color: #fff;
+    background: #333;
+  }
+}
+
+/* 聚焦状态 */
+.navbar-link:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.5);
+  outline-offset: 2px;
+}
+
+.github-link:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.5);
+  outline-offset: 2px;
 } 
