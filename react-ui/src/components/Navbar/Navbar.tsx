@@ -79,65 +79,46 @@ const Navbar: React.FC = () => {
     }
   ];
 
-  const renderUserSection = () => {
-    if (isAuthenticated) {
-      return (
-        <Space size={16}>
-          <a 
-            href="https://github.com/llm-sec/mitm-openai-server" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="navbar-link github-link"
-          >
-            <span className="navbar-icon"><GithubOutlined /></span>
-            <span>GitHub</span>
-          </a>
-          <Dropdown 
-            menu={{ items: userMenuItems }} 
-            placement="bottomRight"
-            trigger={['click']}
-          >
-            <Avatar
-              className="user-avatar"
-              icon={<UserOutlined />}
-              style={{ 
-                cursor: 'pointer',
-                backgroundColor: '#1890ff'
-              }}
-            />
-          </Dropdown>
-        </Space>
-      );
-    }
+  // 渲染GitHub链接
+  const renderGithubLink = () => (
+    <a 
+      href="https://github.com/llm-sec/mitm-openai-server" 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className="github-link"
+    >
+      <span className="navbar-icon"><GithubOutlined /></span>
+      <span>GitHub</span>
+    </a>
+  );
 
-    return (
-      <Space size={8}>
-        <Button type="text" onClick={() => navigate('/login')} className="auth-button">
-          登录
-        </Button>
-        <Button type="primary" onClick={() => navigate('/register')} className="auth-button">
-          注册
-        </Button>
-        <a 
-          href="https://github.com/llm-sec/mitm-openai-server" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="navbar-link github-link"
-        >
-          <span className="navbar-icon"><GithubOutlined /></span>
-          <span>GitHub</span>
-        </a>
-      </Space>
-    );
-  };
+  // 渲染用户头像
+  const renderUserAvatar = () => (
+    <Dropdown 
+      menu={{ items: userMenuItems }} 
+      placement="bottomRight"
+      trigger={['click']}
+    >
+      <Avatar
+        className="user-avatar"
+        icon={<UserOutlined />}
+        style={{ 
+          cursor: 'pointer',
+          backgroundColor: '#1890ff',
+          marginRight: 0
+        }}
+      />
+    </Dropdown>
+  );
 
   return (
     <nav className="navbar">
-      <div className="navbar-content">
-        <Link to="/" className="navbar-brand">
-          <Title level={4}>中间人OpenAI API服务器</Title>
-        </Link>
-        <div className="navbar-right">
+      <div className="navbar-container">
+        {/* 左侧品牌和菜单 */}
+        <div className="navbar-left">
+          <Link to="/" className="navbar-brand">
+            <Title level={4}>中间人OpenAI API服务器</Title>
+          </Link>
           <ul className="navbar-menu">
             {menuItems.map(item => (
               <li key={item.key} className="navbar-item">
@@ -151,7 +132,16 @@ const Navbar: React.FC = () => {
               </li>
             ))}
           </ul>
-          {renderUserSection()}
+        </div>
+        
+        {/* 右侧GitHub链接和用户头像 */}
+        <div className="navbar-right">
+          <div className="github-container">
+            {renderGithubLink()}
+          </div>
+          <div className="avatar-container">
+            {renderUserAvatar()}
+          </div>
         </div>
       </div>
     </nav>

@@ -135,7 +135,7 @@ const LoginPage: React.FC = () => {
               <Col xs={0} sm={0} md={10} style={{ 
                 backgroundColor: '#001529', 
                 color: 'white', 
-                padding: '48px 32px',
+                padding: '0',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center'

@@ -8,24 +8,31 @@
   right: 0;
   z-index: 1000;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  will-change: transform;
-  transform: translateZ(0);
-  backface-visibility: hidden;
 }
 
-.navbar-content {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0;
+.navbar-container {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   height: 64px;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   position: relative;
+}
+
+/* 左侧区域样式 */
+.navbar-left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  padding-left: 24px;
 }
 
 .navbar-brand {
   text-decoration: none;
-  padding-left: 24px;
+  padding-left: 0;
 }
 
 .navbar-brand h4 {
@@ -34,17 +41,7 @@
   font-size: 18px !important;
 }
 
-.navbar-right {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  position: absolute;
-  right: 0;
-  height: 100%;
-  padding-right: 24px;
-  background: #001529;
-}
-
+/* 菜单样式 */
 .navbar-menu {
   display: flex;
   align-items: center;
@@ -88,7 +85,30 @@
   align-items: center;
 }
 
-/* GitHub 链接特殊样式 */
+/* 右侧区域样式 */
+.navbar-right {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.github-container {
+  margin-right: 16px;
+}
+
+.avatar-container {
+  padding: 0;
+  margin: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+/* GitHub 链接样式 */
 .github-link {
   display: inline-flex;
   align-items: center;
@@ -122,30 +142,17 @@
 /* 用户头像样式 */
 .user-avatar {
   transition: transform 0.2s;
+  margin: 0;
+  padding: 0;
 }
 
 .user-avatar:hover {
   transform: scale(1.1);
 }
 
-/* 认证按钮样式 */
-.auth-button {
-  height: 32px;
-  border-radius: 4px;
-}
-
-.auth-button[type="text"] {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.auth-button[type="text"]:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
-}
-
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .navbar-brand {
+  .navbar-left {
     padding-left: 16px;
   }
 
@@ -172,15 +179,10 @@
   .github-link span:not(.navbar-icon) {
     display: none;
   }
-
-  .navbar-right {
-    gap: 16px;
-    padding-right: 16px;
-  }
 }
 
 @media (max-width: 480px) {
-  .navbar-brand {
+  .navbar-left {
     padding-left: 12px;
   }
 
@@ -194,11 +196,6 @@
   
   .github-link {
     padding: 0 6px;
-  }
-
-  .navbar-right {
-    gap: 8px;
-    padding-right: 12px;
   }
 
   .auth-button {
