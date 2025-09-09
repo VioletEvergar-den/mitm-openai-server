@@ -130,12 +130,26 @@ const LoginPage: React.FC = () => {
     <Layout style={{ minHeight: '100vh', backgroundColor: '#f0f2f5' }}>
       <Row justify="center" align="middle" style={{ minHeight: '100vh' }}>
         <Col xs={22} sm={20} md={16} lg={12} xl={10}>
-          <Card style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)' }}>
-            <Row>
+          <Card 
+            style={{ 
+              boxShadow: 'none', 
+              border: 'none', 
+              background: 'transparent',
+              backgroundColor: 'transparent',
+              borderRadius: '0',
+              padding: '0'
+            }}
+            bodyStyle={{ 
+              padding: '0', 
+              background: 'transparent',
+              backgroundColor: 'transparent'
+            }}
+          >
+            <Row style={{ overflow: 'hidden', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)' }}>
               <Col xs={0} sm={0} md={10} style={{ 
                 backgroundColor: '#001529', 
                 color: 'white', 
-                padding: '0',
+                padding: '48px 40px',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center'
@@ -163,7 +177,7 @@ const LoginPage: React.FC = () => {
                   </Space>
                 </Typography>
               </Col>
-              <Col xs={24} sm={24} md={14} style={{ padding: '48px 32px' }}>
+              <Col xs={24} sm={24} md={14} style={{ padding: '48px 40px', backgroundColor: 'white' }}>
                 <Title level={3} style={{ textAlign: 'center' }}>系统登录</Title>
                 {error && (
                   <Alert
