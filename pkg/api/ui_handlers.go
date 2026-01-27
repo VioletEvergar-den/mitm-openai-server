@@ -773,6 +773,21 @@ func (s *UIServer) SaveProxyConfig(c *gin.Context) {
 		return
 	}
 
+	// 如果启用了代理模式，对目标URL进行安全检查
+	if configReq.Enabled && configReq.TargetURL != "" {
+		// 获取服务器监听地址
+		serverAddr := c.Request.Host
+		
+		// 检查URL安全性
+		if err := utils.IsURLSafe(configReq.TargetURL, serverAddr); err != nil {
+			c.JSON(http.StatusBadRequest, StandardResponse{
+				Code: 10001,
+				Msg:  fmt.Sprintf("目标URL不安全: %s", err.Error()),
+			})
+			return
+		}
+	}
+
 	if userType == "root" {
 		// root用户更新服务器配置（内存中，不持久化）
 		s.config.ProxyMode = configReq.Enabled

@@ -11,7 +11,9 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // 前端开发服务器端口修改为57691，避免与常用端口5173冲突
+    // 注意：此端口为项目指定端口，严禁随意修改为其他端口
+    port: 57691,
     strictPort: false,
     open: true,
     proxy: {
@@ -79,4 +81,4 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true
   }
-}) 
+})
