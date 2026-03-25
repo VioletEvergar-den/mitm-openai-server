@@ -5,8 +5,8 @@ import JsonCardView from './JsonCardView';
 interface ResponseContentProps {
   responseHeaders: any;
   responseBody?: any;
-  copyToClipboard: (text: any) => void;
-  jsonPrettyTheme: any;
+  copyToClipboard: (text: any) => Promise<boolean>;
+  jsonPrettyTheme?: any;
 }
 
 const ResponseContent: React.FC<ResponseContentProps> = ({

@@ -6,8 +6,8 @@ interface RequestContentProps {
   requestHeaders: any;
   queryParams?: any;
   requestBody?: any;
-  copyToClipboard: (text: any) => void;
-  jsonPrettyTheme: any;
+  copyToClipboard: (text: any) => Promise<boolean>;
+  jsonPrettyTheme?: any;
 }
 
 const RequestContent: React.FC<RequestContentProps> = ({
