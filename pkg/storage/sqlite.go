@@ -147,6 +147,34 @@ func (s *SQLiteStorage) InitDatabase() error {
 		}
 	}
 
+	// 创建默认API用户（用于未认证的API请求）
+	err = s.ensureDefaultAPIUser()
+	if err != nil {
+		return fmt.Errorf("创建默认API用户失败: %w", err)
+	}
+
+	return nil
+}
+
+// ensureDefaultAPIUser 确保默认API用户存在
+func (s *SQLiteStorage) ensureDefaultAPIUser() error {
+	var count int
+	err := s.db.QueryRow("SELECT COUNT(*) FROM users WHERE username = 'api_user'").Scan(&count)
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		_, err = s.db.Exec(`
+			INSERT INTO users (username, password, user_type, is_active, proxy_enabled, max_requests, data_retention_days)
+			VALUES ('api_user', '', 'system', 1, 0, 100000, 365)
+		`)
+		if err != nil {
+			return err
+		}
+		log.Printf("已创建默认API用户: api_user")
+	}
+
 	return nil
 }
 

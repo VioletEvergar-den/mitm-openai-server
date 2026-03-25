@@ -17,16 +17,36 @@ import (
 
 // Handler 处理OpenAI API请求的处理器
 type Handler struct {
-	storage       storage.Storage
-	openaiService Service
+	storage        storage.Storage
+	openaiService  Service
+	defaultUserID  int64
 }
 
 // NewHandler 创建一个新的OpenAI处理器
 func NewHandler(storage storage.Storage, openaiService Service) *Handler {
-	return &Handler{
+	h := &Handler{
 		storage:       storage,
 		openaiService: openaiService,
 	}
+
+	h.defaultUserID = h.getDefaultAPIUserID()
+
+	return h
+}
+
+// getDefaultAPIUserID 获取默认API用户的ID
+func (h *Handler) getDefaultAPIUserID() int64 {
+	if h.storage == nil {
+		return 1
+	}
+
+	user, err := h.storage.GetUserByUsername("api_user")
+	if err != nil {
+		fmt.Printf("警告: 无法获取默认API用户: %v，使用ID=1\n", err)
+		return 1
+	}
+
+	return user.ID
 }
 
 // SetupRoutes 设置OpenAI API代理路由
@@ -71,19 +91,34 @@ func (h *Handler) SetupRoutes(router *gin.Engine, apiMiddleware gin.HandlerFunc)
 	})
 
 	// 注册所有需要的OpenAI API路径
+	// 支持多种HTTP方法的路由
 	openaiGroup.POST("/chat/completions", h.HandleRequest)
+	openaiGroup.GET("/chat/completions", h.HandleRequest)
+
 	openaiGroup.POST("/completions", h.HandleRequest)
+	openaiGroup.GET("/completions", h.HandleRequest)
+
 	openaiGroup.POST("/embeddings", h.HandleRequest)
+	openaiGroup.GET("/embeddings", h.HandleRequest)
+
 	openaiGroup.GET("/models", h.HandleRequest)
+	openaiGroup.POST("/models", h.HandleRequest)
 
 	// 以下是更多可能需要的OpenAI API路径
 	openaiGroup.GET("/models/:model", h.HandleRequest)
+	openaiGroup.POST("/models/:model", h.HandleRequest)
+
 	openaiGroup.POST("/images/generations", h.HandleRequest)
+	openaiGroup.GET("/images/generations", h.HandleRequest)
+
 	openaiGroup.POST("/audio/transcriptions", h.HandleRequest)
 	openaiGroup.POST("/audio/translations", h.HandleRequest)
 	openaiGroup.POST("/fine-tuning/jobs", h.HandleRequest)
 	openaiGroup.GET("/fine-tuning/jobs", h.HandleRequest)
 	openaiGroup.GET("/fine-tuning/jobs/:job_id", h.HandleRequest)
+
+	// 添加通配路由处理所有其他/v1路径
+	openaiGroup.Any("/*path", h.HandleRequest)
 }
 
 // HandleRequest 处理OpenAI API请求
@@ -225,8 +260,10 @@ func (h *Handler) SaveRequest(userID int64, request *storage.Request) error {
 func (h *Handler) getUserFromContext(c *gin.Context) (int64, string) {
 	// 尝试从上下文中获取用户信息
 	if userID, exists := c.Get("user_id"); exists {
-		if username, exists := c.Get("username"); exists {
-			return userID.(int64), username.(string)
+		if uid, ok := userID.(int64); ok && uid > 0 {
+			if username, exists := c.Get("username"); exists {
+				return uid, username.(string)
+			}
 		}
 	}
 
@@ -235,13 +272,13 @@ func (h *Handler) getUserFromContext(c *gin.Context) (int64, string) {
 	if authHeader != "" {
 		// 简单的token解析，实际应用中需要更严格的验证
 		if strings.HasPrefix(authHeader, "Bearer ") {
-			// 为了向后兼容，暂时使用默认用户
-			return 0, "api_user"
+			// 使用默认API用户的实际ID
+			return h.defaultUserID, "api_user"
 		}
 	}
 
-	// 默认情况：使用匿名用户（ID为0，username为api_user）
-	return 0, "api_user"
+	// 默认情况：使用默认API用户的实际ID
+	return h.defaultUserID, "api_user"
 }
 
 // HandleOpenAIRequest 处理OpenAI API请求的通用处理器

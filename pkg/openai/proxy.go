@@ -34,12 +34,17 @@ func newProxyService(config Config) Service {
 	// 初始化支持的API
 	supportedAPI := map[string]bool{
 		"POST /chat/completions":     true,
+		"GET /chat/completions":      true,
 		"POST /completions":          true,
+		"GET /completions":           true,
 		"POST /embeddings":           true,
+		"GET /embeddings":            true,
 		"POST /images/generations":   true,
+		"GET /images/generations":    true,
 		"POST /audio/transcriptions": true,
 		"POST /moderations":          true,
 		"GET /models":                true,
+		"POST /models":               true,
 	}
 
 	return &proxyService{
