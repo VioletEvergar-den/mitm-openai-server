@@ -66,6 +66,11 @@ func SaveRequest(userID int64, req *Request, store storage.Storage) error {
 // 返回:
 //   - *Request: API请求模型
 func ConvertStorageToAPIRequest(req *storage.Request) *Request {
+	// 添加nil检查
+	if req == nil {
+		return nil
+	}
+
 	// 创建API请求模型
 	apiReq := &Request{
 		ID:     req.ID,

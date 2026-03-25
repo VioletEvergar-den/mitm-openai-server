@@ -116,9 +116,6 @@ func (h *Handler) SetupRoutes(router *gin.Engine, apiMiddleware gin.HandlerFunc)
 	openaiGroup.POST("/fine-tuning/jobs", h.HandleRequest)
 	openaiGroup.GET("/fine-tuning/jobs", h.HandleRequest)
 	openaiGroup.GET("/fine-tuning/jobs/:job_id", h.HandleRequest)
-
-	// 添加通配路由处理所有其他/v1路径
-	openaiGroup.Any("/*path", h.HandleRequest)
 }
 
 // HandleRequest 处理OpenAI API请求

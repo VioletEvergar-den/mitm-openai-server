@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -152,6 +155,37 @@ func runServer() {
 		log.Fatalf("初始化SQLite存储失败: %v", storageErr)
 	}
 
+	// 从 login.json 加载 UI 凭据（如果存在）
+	loginFile := filepath.Join(absDataDir, "login.json")
+	if _, err := os.Stat(loginFile); err == nil {
+		loginData, err := os.ReadFile(loginFile)
+		if err == nil {
+			var loginCreds struct {
+				Username string `json:"username"`
+				Password string `json:"password"`
+			}
+			if json.Unmarshal(loginData, &loginCreds) == nil {
+				if loginCreds.Username != "" {
+					uiUsername = loginCreds.Username
+				}
+				if loginCreds.Password != "" {
+					uiPassword = loginCreds.Password
+				}
+				if verbose {
+					log.Printf("从 login.json 加载凭据: 用户名=%s", uiUsername)
+				}
+			}
+		}
+	}
+
+	// 如果密码仍为空，生成随机密码
+	if uiPassword == "" {
+		uiPassword = generateRandomPassword(12)
+		if verbose {
+			log.Printf("生成随机密码: %s", uiPassword)
+		}
+	}
+
 	// 创建服务器配置
 	config := server.ServerConfig{
 		Storage:        storageImpl,
@@ -242,4 +276,13 @@ func ensureUIDirectory(uiDir string) error {
 	}
 
 	return nil
+}
+
+// generateRandomPassword 生成指定长度的随机密码
+func generateRandomPassword(length int) string {
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		return "defaultpassword"
+	}
+	return hex.EncodeToString(bytes)[:length]
 }

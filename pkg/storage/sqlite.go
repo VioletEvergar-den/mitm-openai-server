@@ -227,13 +227,14 @@ func (s *SQLiteStorage) GetUserByUsername(username string) (*User, error) {
 
 	var user User
 	var createdAt, updatedAt, lastLoginAt sql.NullString
+	var proxyTargetURL, proxyAuthType, proxyUsername, proxyPassword, proxyToken, storagePath sql.NullString
 
 	err := s.db.QueryRow(query, username).Scan(
 		&user.ID, &user.Username, &user.Password,
 		&user.UserType, &user.IsActive, &createdAt, &updatedAt, &lastLoginAt,
-		&user.ProxyEnabled, &user.ProxyTargetURL, &user.ProxyAuthType,
-		&user.ProxyUsername, &user.ProxyPassword, &user.ProxyToken,
-		&user.StoragePath, &user.MaxRequests, &user.DataRetentionDays,
+		&user.ProxyEnabled, &proxyTargetURL, &proxyAuthType,
+		&proxyUsername, &proxyPassword, &proxyToken,
+		&storagePath, &user.MaxRequests, &user.DataRetentionDays,
 	)
 
 	if err != nil {
@@ -260,6 +261,26 @@ func (s *SQLiteStorage) GetUserByUsername(username string) (*User, error) {
 		}
 	}
 
+	// 解析可能为NULL的字段
+	if proxyTargetURL.Valid {
+		user.ProxyTargetURL = proxyTargetURL.String
+	}
+	if proxyAuthType.Valid {
+		user.ProxyAuthType = proxyAuthType.String
+	}
+	if proxyUsername.Valid {
+		user.ProxyUsername = proxyUsername.String
+	}
+	if proxyPassword.Valid {
+		user.ProxyPassword = proxyPassword.String
+	}
+	if proxyToken.Valid {
+		user.ProxyToken = proxyToken.String
+	}
+	if storagePath.Valid {
+		user.StoragePath = storagePath.String
+	}
+
 	return &user, nil
 }
 
@@ -276,13 +297,14 @@ func (s *SQLiteStorage) GetUserByID(userID int64) (*User, error) {
 
 	var user User
 	var createdAt, updatedAt, lastLoginAt sql.NullString
+	var proxyTargetURL, proxyAuthType, proxyUsername, proxyPassword, proxyToken, storagePath sql.NullString
 
 	err := s.db.QueryRow(query, userID).Scan(
 		&user.ID, &user.Username, &user.Password,
 		&user.UserType, &user.IsActive, &createdAt, &updatedAt, &lastLoginAt,
-		&user.ProxyEnabled, &user.ProxyTargetURL, &user.ProxyAuthType,
-		&user.ProxyUsername, &user.ProxyPassword, &user.ProxyToken,
-		&user.StoragePath, &user.MaxRequests, &user.DataRetentionDays,
+		&user.ProxyEnabled, &proxyTargetURL, &proxyAuthType,
+		&proxyUsername, &proxyPassword, &proxyToken,
+		&storagePath, &user.MaxRequests, &user.DataRetentionDays,
 	)
 
 	if err != nil {
@@ -292,7 +314,7 @@ func (s *SQLiteStorage) GetUserByID(userID int64) (*User, error) {
 		return nil, fmt.Errorf("查询用户失败: %w", err)
 	}
 
-	// 解析时间字段（同上）
+	// 解析时间字段
 	if createdAt.Valid {
 		if t, err := time.Parse("2006-01-02 15:04:05", createdAt.String); err == nil {
 			user.CreatedAt = t
@@ -307,6 +329,26 @@ func (s *SQLiteStorage) GetUserByID(userID int64) (*User, error) {
 		if t, err := time.Parse("2006-01-02 15:04:05", lastLoginAt.String); err == nil {
 			user.LastLoginAt = t
 		}
+	}
+
+	// 解析可能为NULL的字段
+	if proxyTargetURL.Valid {
+		user.ProxyTargetURL = proxyTargetURL.String
+	}
+	if proxyAuthType.Valid {
+		user.ProxyAuthType = proxyAuthType.String
+	}
+	if proxyUsername.Valid {
+		user.ProxyUsername = proxyUsername.String
+	}
+	if proxyPassword.Valid {
+		user.ProxyPassword = proxyPassword.String
+	}
+	if proxyToken.Valid {
+		user.ProxyToken = proxyToken.String
+	}
+	if storagePath.Valid {
+		user.StoragePath = storagePath.String
 	}
 
 	return &user, nil
@@ -539,6 +581,78 @@ func (s *SQLiteStorage) GetRequestByID(userID int64, id string) (*Request, error
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("未找到ID为 %s 的请求或无权限访问", id)
+		}
+		return nil, fmt.Errorf("查询请求失败: %w", err)
+	}
+
+	// 设置IP地址字段
+	req.ClientIP = ipAddress
+	req.IPAddress = ipAddress
+
+	// 解析时间戳
+	timestamp, err := time.Parse("2006-01-02 15:04:05", timestampStr)
+	if err != nil {
+		req.Timestamp = time.Now()
+	} else {
+		req.Timestamp = timestamp
+	}
+
+	// 解析JSON字段
+	if err := json.Unmarshal([]byte(headersJSON), &req.Headers); err != nil {
+		return nil, fmt.Errorf("解析请求头JSON失败: %w", err)
+	}
+
+	if err := json.Unmarshal([]byte(queryJSON), &req.Query); err != nil {
+		return nil, fmt.Errorf("解析查询参数JSON失败: %w", err)
+	}
+
+	if bodyJSON.Valid && bodyJSON.String != "" {
+		if err := json.Unmarshal([]byte(bodyJSON.String), &req.Body); err != nil {
+			return nil, fmt.Errorf("解析请求体JSON失败: %w", err)
+		}
+	}
+
+	if responseJSON.Valid && responseJSON.String != "" {
+		var resp ProxyResponse
+		if err := json.Unmarshal([]byte(responseJSON.String), &resp); err != nil {
+			return nil, fmt.Errorf("解析响应JSON失败: %w", err)
+		}
+		req.Response = &resp
+	}
+
+	if metadataJSON.Valid && metadataJSON.String != "" {
+		if err := json.Unmarshal([]byte(metadataJSON.String), &req.Metadata); err != nil {
+			return nil, fmt.Errorf("解析元数据JSON失败: %w", err)
+		}
+	}
+
+	return &req, nil
+}
+
+// GetRequestByIDOnly 仅根据ID获取请求（不验证用户归属）
+func (s *SQLiteStorage) GetRequestByIDOnly(id string) (*Request, error) {
+	var (
+		req          Request
+		timestampStr string
+		headersJSON  string
+		queryJSON    string
+		bodyJSON     sql.NullString
+		responseJSON sql.NullString
+		metadataJSON sql.NullString
+		ipAddress    string
+	)
+
+	err := s.db.QueryRow(
+		`SELECT id, user_id, method, path, timestamp, headers, query, body, client_ip, response, metadata
+		FROM requests WHERE id = ?`, id,
+	).Scan(
+		&req.ID, &req.UserID, &req.Method, &req.Path, &timestampStr,
+		&headersJSON, &queryJSON, &bodyJSON, &ipAddress, &responseJSON, &metadataJSON,
+	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("未找到ID为 %s 的请求", id)
 		}
 		return nil, fmt.Errorf("查询请求失败: %w", err)
 	}

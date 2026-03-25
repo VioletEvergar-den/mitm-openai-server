@@ -167,7 +167,15 @@ func (s *Server) setupStaticRoutes(router *gin.Engine) {
 			c.File(filepath.Join(absUIDir, "index.html"))
 		})
 
-		router.GET("/ui/*path", func(c *gin.Context) {
+		router.GET("/ui/requests", func(c *gin.Context) {
+			c.File(filepath.Join(absUIDir, "index.html"))
+		})
+
+		router.GET("/ui/settings", func(c *gin.Context) {
+			c.File(filepath.Join(absUIDir, "index.html"))
+		})
+
+		router.GET("/ui/guide", func(c *gin.Context) {
 			c.File(filepath.Join(absUIDir, "index.html"))
 		})
 	}

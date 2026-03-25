@@ -442,26 +442,8 @@ func (s *UIServer) GetRequestByID(c *gin.Context) {
 
 	// 根据用户类型决定数据访问范围
 	if userType == "root" {
-		// root用户可以访问任何请求，但需要先获取请求以确定归属用户
-		allRequests, err := s.storage.GetAllRequests(1, 0)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, StandardResponse{
-				Code: 10004,
-				Msg:  "查询请求失败: " + err.Error(),
-			})
-			return
-		}
-
-		// 查找指定ID的请求
-		for _, r := range allRequests {
-			if r.ID == id {
-				req, err = s.storage.GetRequestByID(r.UserID, id)
-				break
-			}
-		}
-		if req == nil && err == nil {
-			err = fmt.Errorf("请求不存在")
-		}
+		// root用户可以访问任何请求，使用GetRequestByIDOnly
+		req, err = s.storage.GetRequestByIDOnly(id)
 	} else {
 		// 普通用户只能访问自己的请求
 		req, err = s.storage.GetRequestByID(userID, id)

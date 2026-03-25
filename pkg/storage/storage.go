@@ -55,6 +55,17 @@ type Storage interface {
 	//   - error: 检索过程中的错误，或者当请求不存在/无权限时返回错误
 	GetRequestByID(userID int64, id string) (*Request, error)
 
+	// GetRequestByIDOnly 仅根据ID获取请求（不验证用户归属）
+	// 用于root用户或管理员查看任意请求
+	//
+	// 参数:
+	//   - id: 请求的唯一标识符
+	//
+	// 返回:
+	//   - *Request: 请求对象，如果找到
+	//   - error: 检索过程中的错误，或者当请求不存在时返回错误
+	GetRequestByIDOnly(id string) (*Request, error)
+
 	// GetUserRequests 获取指定用户的所有请求，支持分页
 	//
 	// 参数:
