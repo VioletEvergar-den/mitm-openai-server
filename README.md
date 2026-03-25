@@ -386,10 +386,16 @@ mitm-openai-server/
 
 ---
 
+## 🙏 致谢
+
+本项目 Fork 自 [llm-sec/mitm-openai-server](https://github.com/llm-sec/mitm-openai-server)，感谢原作者 **LLM-SEC 团队** 的开源贡献。
+
+---
+
 <div align="center">
 
 **如果这个项目对你有帮助，请给一个 ⭐ Star 支持一下！**
 
-Made with ❤️ by [VioletEvergar-den](https://github.com/VioletEvergar-den)
+Fork 维护: [VioletEvergar-den](https://github.com/VioletEvergar-den) | 原项目: [llm-sec](https://github.com/llm-sec)
 
 </div>
