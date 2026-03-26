@@ -802,6 +802,8 @@ func (s *UIServer) SaveProxyConfig(c *gin.Context) {
 		}
 		s.config.ModelMapping = configReq.ModelMapping
 
+		fmt.Printf("[SaveProxyConfig] 保存的ModelMapping: %v\n", configReq.ModelMapping)
+
 		newConfig := openai.Config{
 			ProxyMode:      s.config.ProxyMode,
 			TargetURL:      s.config.TargetURL,

@@ -308,7 +308,8 @@ func (s *proxyService) applyModelMapping(body []byte) []byte {
 	}
 
 	if model, ok := reqBody["model"].(string); ok {
-		if s.config.ModelMapping != nil {
+		fmt.Printf("[ModelMapping] 当前配置的映射表: %v\n", s.config.ModelMapping)
+		if s.config.ModelMapping != nil && len(s.config.ModelMapping) > 0 {
 			if actualModel, exists := s.config.ModelMapping[model]; exists && actualModel != "" {
 				fmt.Printf("[ModelMapping] 映射模型: %s -> %s\n", model, actualModel)
 				reqBody["model"] = actualModel
@@ -318,8 +319,10 @@ func (s *proxyService) applyModelMapping(body []byte) []byte {
 				}
 				return newBody
 			}
+			fmt.Printf("[ModelMapping] 未找到模型 '%s' 的映射，可用映射: %v\n", model, s.config.ModelMapping)
+		} else {
+			fmt.Printf("[ModelMapping] 映射表为空或未配置，使用原始模型名: %s\n", model)
 		}
-		fmt.Printf("[ModelMapping] 未找到模型 '%s' 的映射，使用原始模型名\n", model)
 	}
 
 	return body
