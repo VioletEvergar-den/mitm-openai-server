@@ -20,6 +20,7 @@ type Handler struct {
 	storage        storage.Storage
 	openaiService  Service
 	defaultUserID  int64
+	config         Config
 }
 
 // NewHandler 创建一个新的OpenAI处理器
@@ -32,6 +33,32 @@ func NewHandler(storage storage.Storage, openaiService Service) *Handler {
 	h.defaultUserID = h.getDefaultAPIUserID()
 
 	return h
+}
+
+// UpdateServiceConfig 更新服务配置，必要时切换服务实例
+func (h *Handler) UpdateServiceConfig(config Config) {
+	h.config = config
+	
+	if config.ProxyMode && config.TargetURL != "" {
+		if h.openaiService.Name() != "OpenAI API Proxy" {
+			fmt.Println("切换到代理模式...")
+			h.openaiService = ProxyServiceCreator(config)
+		} else {
+			h.openaiService.UpdateConfig(config)
+		}
+	} else {
+		if h.openaiService.Name() == "OpenAI API Proxy" {
+			fmt.Println("切换到模拟模式...")
+			h.openaiService = MockServiceCreator(config)
+		} else {
+			h.openaiService.UpdateConfig(config)
+		}
+	}
+}
+
+// GetService 获取当前服务实例
+func (h *Handler) GetService() Service {
+	return h.openaiService
 }
 
 // getDefaultAPIUserID 获取默认API用户的ID

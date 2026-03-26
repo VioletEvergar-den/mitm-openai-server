@@ -797,8 +797,8 @@ func (s *UIServer) SaveProxyConfig(c *gin.Context) {
 		if configReq.ModelMapping != nil {
 			s.config.ModelMapping = configReq.ModelMapping
 		}
-		// 更新OpenAI服务配置
-		s.openaiService.UpdateConfig(openai.Config{
+		
+		newConfig := openai.Config{
 			ProxyMode:      s.config.ProxyMode,
 			TargetURL:      s.config.TargetURL,
 			TargetAuthType: s.config.TargetAuthType,
@@ -806,7 +806,13 @@ func (s *UIServer) SaveProxyConfig(c *gin.Context) {
 			TargetPassword: s.config.TargetPassword,
 			TargetToken:    s.config.TargetToken,
 			ModelMapping:   s.config.ModelMapping,
-		})
+		}
+		
+		s.openaiService.UpdateConfig(newConfig)
+		
+		openai.UpdateGlobalHandlerConfig(newConfig)
+		
+		fmt.Printf("代理模式配置已更新: ProxyMode=%v, TargetURL=%s\n", s.config.ProxyMode, s.config.TargetURL)
 	} else {
 		// 普通用户更新数据库配置
 		userConfig := &storage.UserConfig{

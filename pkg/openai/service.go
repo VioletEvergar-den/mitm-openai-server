@@ -38,6 +38,19 @@ func InitGlobalHandler(storage storage.Storage, service Service) {
 	globalHandler = NewHandler(storage, service)
 }
 
+// UpdateGlobalHandlerConfig 更新全局处理器的服务配置
+// 当代理模式配置改变时调用此函数切换服务实例
+func UpdateGlobalHandlerConfig(config Config) {
+	if globalHandler != nil {
+		globalHandler.UpdateServiceConfig(config)
+	}
+}
+
+// GetGlobalHandler 获取全局处理器实例
+func GetGlobalHandler() *Handler {
+	return globalHandler
+}
+
 // SaveRequest 全局函数，用于保存请求记录
 // 这个函数可以从包外部调用，而不需要直接访问处理器实例
 // 参数:
