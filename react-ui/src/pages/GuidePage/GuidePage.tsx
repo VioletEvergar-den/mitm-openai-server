@@ -35,6 +35,9 @@ const AVAILABLE_MODELS = [
   { value: 'qwen3.5-plus', label: 'Qwen3.5-Plus' },
   { value: 'qwen3.5-flash', label: 'Qwen3.5-Flash' },
   { value: 'qwen3.5-27b', label: 'Qwen3.5-27B' },
+  { value: 'minimax-m2.7', label: 'MiniMax M2.7' },
+  { value: 'minimax-m2.5', label: 'MiniMax M2.5' },
+  { value: 'minimax-m2.5-lightning', label: 'MiniMax M2.5 Lightning' },
 ];
 
 const GuidePage: React.FC = () => {

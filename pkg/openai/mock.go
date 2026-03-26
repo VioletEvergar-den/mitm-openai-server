@@ -16,6 +16,7 @@ import (
 
 // mockService 实现模拟OpenAI服务
 type mockService struct {
+	config          Config
 	responseDelay   time.Duration
 	handlerMapping  map[string]mockHandler // 路径->处理函数的映射
 	supportedModels []string               // 支持的模型列表
@@ -47,6 +48,7 @@ func newMockService(config Config) Service {
 	delay := time.Duration(config.ResponseDelayMs) * time.Millisecond
 
 	svc := &mockService{
+		config:          config,
 		responseDelay:   delay,
 		handlerMapping:  make(map[string]mockHandler),
 		supportedModels: models,
@@ -91,6 +93,9 @@ func getDefaultModels() []string {
 		"qwen3.5-plus",
 		"qwen3.5-flash",
 		"qwen3.5-27b",
+		"minimax-m2.7",
+		"minimax-m2.5",
+		"minimax-m2.5-lightning",
 		"text-embedding-3-small",
 		"text-embedding-3-large",
 		"dall-e-3",
@@ -611,4 +616,9 @@ func (s *mockService) handleListModels(method string, pathParams, queryParams ma
 		"object": "list",
 		"data":   models,
 	}
+}
+
+// UpdateConfig 更新服务配置
+func (s *mockService) UpdateConfig(config Config) {
+	s.config = config
 }

@@ -152,6 +152,9 @@ func (s *proxyService) HandleRequest(method, path string, headers, queryParams m
 		}, nil
 	}
 
+	// 应用模型ID映射
+	body = s.applyModelMapping(body)
+
 	// 构建目标URL
 	targetURL := s.buildURL(path)
 
@@ -290,4 +293,35 @@ func (s *proxyService) addAuthHeader(req *http.Request) {
 			req.Header.Set("Authorization", token)
 		}
 	}
+}
+
+// applyModelMapping 应用模型ID映射
+// 将请求体中的模型名称替换为配置的实际模型ID
+func (s *proxyService) applyModelMapping(body []byte) []byte {
+	if len(s.config.ModelMapping) == 0 || len(body) == 0 {
+		return body
+	}
+
+	var reqBody map[string]interface{}
+	if err := json.Unmarshal(body, &reqBody); err != nil {
+		return body
+	}
+
+	if model, ok := reqBody["model"].(string); ok {
+		if actualModel, exists := s.config.ModelMapping[model]; exists && actualModel != "" {
+			reqBody["model"] = actualModel
+			newBody, err := json.Marshal(reqBody)
+			if err != nil {
+				return body
+			}
+			return newBody
+		}
+	}
+
+	return body
+}
+
+// UpdateConfig 更新服务配置
+func (s *proxyService) UpdateConfig(config Config) {
+	s.config = config
 }

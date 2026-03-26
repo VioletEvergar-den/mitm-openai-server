@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/llm-sec/mitm-openai-server/pkg/openai"
 	"github.com/llm-sec/mitm-openai-server/pkg/storage"
 	"github.com/llm-sec/mitm-openai-server/pkg/utils"
 )
@@ -665,9 +666,10 @@ func (s *UIServer) GetProxyConfig(c *gin.Context) {
 	if userType == "root" {
 		// root用户使用服务器配置
 		config = map[string]interface{}{
-			"enabled":   s.config.ProxyMode,
-			"targetURL": s.config.TargetURL,
-			"authType":  s.config.TargetAuthType,
+			"enabled":      s.config.ProxyMode,
+			"targetURL":    s.config.TargetURL,
+			"authType":     s.config.TargetAuthType,
+			"modelMapping": s.config.ModelMapping,
 		}
 
 		// 根据认证类型添加相应字段
@@ -740,12 +742,13 @@ func (s *UIServer) SaveProxyConfig(c *gin.Context) {
 	}
 
 	var configReq struct {
-		Enabled   bool   `json:"enabled"`
-		TargetURL string `json:"targetURL"`
-		AuthType  string `json:"authType"`
-		Username  string `json:"username,omitempty"`
-		Password  string `json:"password,omitempty"`
-		Token     string `json:"token,omitempty"`
+		Enabled      bool              `json:"enabled"`
+		TargetURL    string            `json:"targetURL"`
+		AuthType     string            `json:"authType"`
+		Username     string            `json:"username,omitempty"`
+		Password     string            `json:"password,omitempty"`
+		Token        string            `json:"token,omitempty"`
+		ModelMapping map[string]string `json:"modelMapping,omitempty"`
 	}
 
 	if err := c.ShouldBindJSON(&configReq); err != nil {
@@ -760,7 +763,7 @@ func (s *UIServer) SaveProxyConfig(c *gin.Context) {
 	if configReq.Enabled && configReq.TargetURL != "" {
 		// 获取服务器监听地址
 		serverAddr := c.Request.Host
-		
+
 		// 检查URL安全性
 		if err := utils.IsURLSafe(configReq.TargetURL, serverAddr); err != nil {
 			c.JSON(http.StatusBadRequest, StandardResponse{
@@ -785,6 +788,19 @@ func (s *UIServer) SaveProxyConfig(c *gin.Context) {
 		if configReq.Token != "" && configReq.Token != "••••••••" {
 			s.config.TargetToken = configReq.Token
 		}
+		if configReq.ModelMapping != nil {
+			s.config.ModelMapping = configReq.ModelMapping
+		}
+		// 更新OpenAI服务配置
+		s.openaiService.UpdateConfig(openai.Config{
+			ProxyMode:      s.config.ProxyMode,
+			TargetURL:      s.config.TargetURL,
+			TargetAuthType: s.config.TargetAuthType,
+			TargetUsername: s.config.TargetUsername,
+			TargetPassword: s.config.TargetPassword,
+			TargetToken:    s.config.TargetToken,
+			ModelMapping:   s.config.ModelMapping,
+		})
 	} else {
 		// 普通用户更新数据库配置
 		userConfig := &storage.UserConfig{

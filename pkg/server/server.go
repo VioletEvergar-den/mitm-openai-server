@@ -44,6 +44,7 @@ func NewServerWithConfig(config api.ServerConfig) *Server {
 		TargetUsername: config.TargetUsername,
 		TargetPassword: config.TargetPassword,
 		TargetToken:    config.TargetToken,
+		ModelMapping:   config.ModelMapping,
 	})
 
 	s.openaiHandler = openai.NewHandler(config.Storage, s.openaiService)

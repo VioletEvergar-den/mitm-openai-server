@@ -35,6 +35,9 @@ type ServerConfig struct {
 	TargetUsername string
 	TargetPassword string
 	TargetToken    string
+
+	// Model ID 映射 (自定义模型名 -> 实际模型ID)
+	ModelMapping map[string]string
 }
 
 // OpenAIServiceInterface 使用 openai.Service 接口

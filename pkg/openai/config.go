@@ -37,6 +37,9 @@ type Config struct {
 
 	// 目标Token（Token认证）
 	TargetToken string `json:"target_token"`
+
+	// Model ID 映射 (自定义模型名 -> 实际模型ID)
+	ModelMapping map[string]string `json:"model_mapping"`
 }
 
 // DefaultConfig 返回默认的OpenAI API服务配置
@@ -48,5 +51,6 @@ func DefaultConfig() Config {
 		APIKey:          "sk-mock-openai-key",
 		ProxyMode:       false,
 		TargetAuthType:  "none",
+		ModelMapping:    make(map[string]string),
 	}
 }

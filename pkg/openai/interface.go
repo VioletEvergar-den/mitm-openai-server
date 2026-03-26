@@ -21,6 +21,9 @@ type Service interface {
 	// body: 请求体(字节数组)
 	// 返回值: 状态码，响应头，响应体，错误信息
 	HandleRequest(method, path string, headers, queryParams map[string]string, body []byte) (int, map[string]string, interface{}, error)
+
+	// UpdateConfig 更新服务配置
+	UpdateConfig(config Config)
 }
 
 // Response 定义标准API响应
