@@ -52,20 +52,30 @@ func (s *UIServer) SetupUIRoutes(router *gin.Engine, authMiddleware gin.HandlerF
 
 	// UI认证中间件（从token提取用户信息）
 	uiAuthMiddleware := func(c *gin.Context) {
+		var token string
+
+		// 首先尝试从Authorization头获取token
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		if authHeader != "" {
+			// 支持"Bearer token"格式和直接的令牌格式
+			token = authHeader
+			if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
+				token = authHeader[7:] // 去掉"Bearer "前缀
+			}
+		}
+
+		// 如果没有Authorization头，尝试从URL参数获取（用于SSE等场景）
+		if token == "" {
+			token = c.Query("token")
+		}
+
+		if token == "" {
 			c.JSON(http.StatusUnauthorized, StandardResponse{
 				Code: 10002,
-				Msg:  "认证失败：缺少Authorization头",
+				Msg:  "认证失败：缺少认证信息",
 			})
 			c.Abort()
 			return
-		}
-
-		// 支持"Bearer token"格式和直接的令牌格式
-		token := authHeader
-		if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
-			token = authHeader[7:] // 去掉"Bearer "前缀
 		}
 
 		// 验证令牌并获取用户上下文

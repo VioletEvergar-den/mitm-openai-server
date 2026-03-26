@@ -15,9 +15,20 @@ import {
   Table,
   Popconfirm,
   Modal,
-  Tag
+  Tag,
+  Alert
 } from 'antd';
-import { PlusOutlined, DeleteOutlined, SyncOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { 
+  PlusOutlined, 
+  DeleteOutlined, 
+  SyncOutlined, 
+  CheckCircleOutlined, 
+  ExclamationCircleOutlined,
+  SettingOutlined,
+  CloudServerOutlined,
+  ApiOutlined,
+  SafetyOutlined
+} from '@ant-design/icons';
 import Layout from '../../components/Layout/Layout';
 import { ProxyConfig } from '../../types';
 import { apiService } from '../../services/api';
@@ -208,188 +219,247 @@ const SettingsPage: React.FC = () => {
 
   return (
     <Layout title="系统设置">
-      <Title level={2}>系统设置</Title>
-      <Paragraph>配置代理服务器以将请求转发到实际的API端点。</Paragraph>
       <Spin spinning={loading}>
-        <Card>
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleFinish}
-            initialValues={proxyConfig || undefined}
-          >
-            <Form.Item label="代理模式" name="enabled" valuePropName="checked">
-              <Switch />
-            </Form.Item>
-            
-            <Paragraph type="secondary">
-              {isProxyEnabled ? '代理模式已启用，请求将转发到目标API服务器。' : '代理模式已禁用，服务器将返回模拟数据。'}
-            </Paragraph>
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <Title level={3} style={{ margin: 0 }}>
+            <SettingOutlined style={{ marginRight: 8 }} />
+            系统设置
+          </Title>
 
-            <Form.Item label="目标API服务器地址" name="targetURL">
-              <Input placeholder="例如: https://api.openai.com" disabled={!isProxyEnabled} />
-            </Form.Item>
-            
-            <Form.Item label="快捷配置">
+          <Card 
+            title={
               <Space>
-                <Button onClick={() => handleQuickConfig('https://api.openai.com')} disabled={!isProxyEnabled}>OpenAI</Button>
-                <Button onClick={() => handleQuickConfig('https://api.deepseek.com')} disabled={!isProxyEnabled}>Deepseek</Button>
+                <CloudServerOutlined />
+                <span>代理配置</span>
               </Space>
-              <Paragraph type="secondary" style={{ marginTop: 8 }}>
-                <Link href="https://platform.openai.com/signup" target="_blank">OpenAI API Key</Link> | <Link href="https://platform.deepseek.com/usage" target="_blank">Deepseek API Key</Link>
-              </Paragraph>
-            </Form.Item>
+            }
+          >
+            <Form
+              form={form}
+              layout="vertical"
+              onFinish={handleFinish}
+              initialValues={proxyConfig || undefined}
+            >
+              <Row gutter={24}>
+                <Col span={24}>
+                  <Form.Item label="代理模式" name="enabled" valuePropName="checked">
+                    <Switch checkedChildren="启用" unCheckedChildren="禁用" />
+                  </Form.Item>
+                  
+                  <Alert
+                    type={isProxyEnabled ? 'success' : 'info'}
+                    message={isProxyEnabled ? '代理模式已启用，请求将转发到目标API服务器' : '代理模式已禁用，服务器将返回模拟数据'}
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                  />
+                </Col>
 
-            <Form.Item label="认证类型" name="authType">
-              <Select disabled={!isProxyEnabled}>
-                <Option value="none">无认证</Option>
-                <Option value="basic">基本认证 (用户名/密码)</Option>
-                <Option value="token">令牌认证 (Bearer Token)</Option>
-              </Select>
-            </Form.Item>
+                <Col xs={24} md={16}>
+                  <Form.Item label="目标API服务器地址" name="targetURL">
+                    <Input 
+                      placeholder="例如: https://api.openai.com" 
+                      disabled={!isProxyEnabled}
+                      prefix={<ApiOutlined />}
+                    />
+                  </Form.Item>
+                </Col>
 
-            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.authType !== curr.authType}>
-              {({ getFieldValue }) => {
-                const authType = getFieldValue('authType');
-                if (authType === 'basic') {
-                  return (
-                    <Row gutter={16}>
-                      <Col span={12}>
-                        <Form.Item label="用户名" name="username">
-                          <Input placeholder="用户名" disabled={!isProxyEnabled} />
-                        </Form.Item>
-                      </Col>
-                      <Col span={12}>
-                        <Form.Item label="密码" name="password">
-                          <Input.Password placeholder="密码" disabled={!isProxyEnabled} />
-                        </Form.Item>
-                      </Col>
-                    </Row>
-                  );
-                }
-                if (authType === 'token') {
-                  return (
-                    <Form.Item label="访问令牌" name="token">
-                      <Input.Password placeholder="例如: sk-xxxxxxxx" disabled={!isProxyEnabled} />
-                    </Form.Item>
-                  );
-                }
-                return null;
-              }}
-            </Form.Item>
+                <Col xs={24} md={8}>
+                  <Form.Item label="快捷配置">
+                    <Space wrap>
+                      <Button 
+                        size="small"
+                        onClick={() => handleQuickConfig('https://api.openai.com')} 
+                        disabled={!isProxyEnabled}
+                      >
+                        OpenAI
+                      </Button>
+                      <Button 
+                        size="small"
+                        onClick={() => handleQuickConfig('https://api.deepseek.com')} 
+                        disabled={!isProxyEnabled}
+                      >
+                        Deepseek
+                      </Button>
+                    </Space>
+                  </Form.Item>
+                </Col>
 
-            <Divider>Model ID 映射</Divider>
-            
-            <Paragraph type="secondary">
-              配置模型名称映射，代理转发时将请求中的模型名替换为实际的模型ID。
-              例如：将 <Text code>gpt-5.4</Text> 映射到 <Text code>abab6.5-chat</Text>
-            </Paragraph>
+                <Col xs={24} md={8}>
+                  <Form.Item label="认证类型" name="authType">
+                    <Select disabled={!isProxyEnabled}>
+                      <Option value="none">无认证</Option>
+                      <Option value="basic">基本认证</Option>
+                      <Option value="token">令牌认证</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
 
-            <div style={{ marginBottom: 16 }}>
-              <Space.Compact style={{ width: '100%' }}>
-                <Input
-                  placeholder="自定义模型名 (如: gpt-5.4)"
-                  value={newCustomModel}
-                  onChange={(e) => setNewCustomModel(e.target.value)}
-                  disabled={!isProxyEnabled}
-                  style={{ width: '40%' }}
-                />
-                <Input
-                  placeholder="实际模型ID (如: abab6.5-chat)"
-                  value={newActualModel}
-                  onChange={(e) => setNewActualModel(e.target.value)}
-                  disabled={!isProxyEnabled}
-                  style={{ width: '40%' }}
-                />
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={handleAddMapping}
-                  disabled={!isProxyEnabled}
-                >
-                  添加
-                </Button>
-              </Space.Compact>
-            </div>
+                <Form.Item noStyle shouldUpdate={(prev, curr) => prev.authType !== curr.authType}>
+                  {({ getFieldValue }) => {
+                    const authType = getFieldValue('authType');
+                    if (authType === 'basic') {
+                      return (
+                        <>
+                          <Col xs={24} md={8}>
+                            <Form.Item label="用户名" name="username">
+                              <Input placeholder="用户名" disabled={!isProxyEnabled} />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} md={8}>
+                            <Form.Item label="密码" name="password">
+                              <Input.Password placeholder="密码" disabled={!isProxyEnabled} />
+                            </Form.Item>
+                          </Col>
+                        </>
+                      );
+                    }
+                    if (authType === 'token') {
+                      return (
+                        <Col xs={24} md={16}>
+                          <Form.Item label="访问令牌" name="token">
+                            <Input.Password 
+                              placeholder="例如: sk-xxxxxxxx" 
+                              disabled={!isProxyEnabled}
+                              prefix={<SafetyOutlined />}
+                            />
+                          </Form.Item>
+                        </Col>
+                      );
+                    }
+                    return null;
+                  }}
+                </Form.Item>
+              </Row>
 
-            {modelMappings.length > 0 && (
-              <Table
-                dataSource={modelMappings}
-                columns={mappingColumns}
-                rowKey="key"
-                pagination={false}
-                size="small"
-                bordered
-              />
-            )}
-            
-            <Divider />
-            
-            <Form.Item>
-              <Button type="primary" htmlType="submit" loading={saving}>
-                保存配置
-              </Button>
-            </Form.Item>
-          </Form>
-        </Card>
-
-        <Card style={{ marginTop: 16 }}>
-          <Title level={4}>系统更新</Title>
-          <Paragraph type="secondary">
-            检查并更新到最新版本。更新后需要重启服务器。
-          </Paragraph>
-          
-          <Space direction="vertical" style={{ width: '100%' }}>
-            {updateInfo && (
-              <div style={{ marginBottom: 16 }}>
+              <Divider orientation="left">
                 <Space>
-                  <Text strong>当前版本:</Text>
-                  <Tag color="blue">{updateInfo.currentVersion}</Tag>
-                  <Text strong>最新版本:</Text>
-                  <Tag color={updateInfo.hasUpdate ? 'green' : 'blue'}>
-                    {updateInfo.latestVersion}
-                  </Tag>
-                  {updateInfo.hasUpdate ? (
-                    <Tag color="orange" icon={<ExclamationCircleOutlined />}>有新版本</Tag>
-                  ) : (
-                    <Tag color="green" icon={<CheckCircleOutlined />}>已是最新</Tag>
-                  )}
+                  <ApiOutlined />
+                  Model ID 映射
                 </Space>
-              </div>
-            )}
-            
-            <Space>
-              <Button
-                icon={<SyncOutlined spin={checkingUpdate} />}
-                onClick={handleCheckUpdate}
-                loading={checkingUpdate}
-              >
-                检查更新
-              </Button>
+              </Divider>
               
-              {updateInfo?.hasUpdate && (
-                <>
+              <Paragraph type="secondary">
+                配置模型名称映射，代理转发时将请求中的模型名替换为实际的模型ID。
+                例如：将 <Text code>gpt-5.4</Text> 映射到 <Text code>abab6.5-chat</Text>
+              </Paragraph>
+
+              <div style={{ marginBottom: 16 }}>
+                <Space.Compact style={{ width: '100%' }}>
+                  <Input
+                    placeholder="自定义模型名 (如: gpt-5.4)"
+                    value={newCustomModel}
+                    onChange={(e) => setNewCustomModel(e.target.value)}
+                    disabled={!isProxyEnabled}
+                    style={{ width: '40%' }}
+                  />
+                  <Input
+                    placeholder="实际模型ID (如: abab6.5-chat)"
+                    value={newActualModel}
+                    onChange={(e) => setNewActualModel(e.target.value)}
+                    disabled={!isProxyEnabled}
+                    style={{ width: '40%' }}
+                  />
                   <Button
                     type="primary"
-                    onClick={() => handlePerformUpdate(false)}
-                    loading={updating}
+                    icon={<PlusOutlined />}
+                    onClick={handleAddMapping}
+                    disabled={!isProxyEnabled}
                   >
-                    下载更新
+                    添加
                   </Button>
-                  <Button
-                    onClick={() => handlePerformUpdate(true)}
-                    loading={updating}
-                  >
-                    Git 更新
-                  </Button>
-                </>
+                </Space.Compact>
+              </div>
+
+              {modelMappings.length > 0 && (
+                <Table
+                  dataSource={modelMappings}
+                  columns={mappingColumns}
+                  rowKey="key"
+                  pagination={false}
+                  size="small"
+                  bordered
+                />
               )}
+              
+              <Divider />
+              
+              <Form.Item>
+                <Button type="primary" htmlType="submit" loading={saving} size="large">
+                  保存配置
+                </Button>
+              </Form.Item>
+            </Form>
+          </Card>
+
+          <Card 
+            title={
+              <Space>
+                <SyncOutlined spin={checkingUpdate} />
+                <span>系统更新</span>
+              </Space>
+            }
+          >
+            <Paragraph type="secondary">
+              检查并更新到最新版本。更新后需要重启服务器。
+            </Paragraph>
+            
+            <Space direction="vertical" style={{ width: '100%' }} size="large">
+              {updateInfo && (
+                <Card size="small" bordered={false} style={{ background: 'transparent' }}>
+                  <Space wrap size="large">
+                    <div>
+                      <Text type="secondary">当前版本:</Text>
+                      <Tag color="blue" style={{ marginLeft: 8 }}>{updateInfo.currentVersion}</Tag>
+                    </div>
+                    <div>
+                      <Text type="secondary">最新版本:</Text>
+                      <Tag color={updateInfo.hasUpdate ? 'green' : 'blue'} style={{ marginLeft: 8 }}>
+                        {updateInfo.latestVersion}
+                      </Tag>
+                    </div>
+                    {updateInfo.hasUpdate ? (
+                      <Tag color="orange" icon={<ExclamationCircleOutlined />}>有新版本可用</Tag>
+                    ) : (
+                      <Tag color="green" icon={<CheckCircleOutlined />}>已是最新版本</Tag>
+                    )}
+                  </Space>
+                </Card>
+              )}
+              
+              <Space wrap>
+                <Button
+                  icon={<SyncOutlined spin={checkingUpdate} />}
+                  onClick={handleCheckUpdate}
+                  loading={checkingUpdate}
+                >
+                  检查更新
+                </Button>
+                
+                {updateInfo?.hasUpdate && (
+                  <>
+                    <Button
+                      type="primary"
+                      onClick={() => handlePerformUpdate(false)}
+                      loading={updating}
+                    >
+                      下载更新
+                    </Button>
+                    <Button
+                      onClick={() => handlePerformUpdate(true)}
+                      loading={updating}
+                    >
+                      Git 更新
+                    </Button>
+                  </>
+                )}
+              </Space>
             </Space>
-          </Space>
-        </Card>
+          </Card>
+        </Space>
       </Spin>
     </Layout>
   );
 };
 
-export default SettingsPage; 
+export default SettingsPage;

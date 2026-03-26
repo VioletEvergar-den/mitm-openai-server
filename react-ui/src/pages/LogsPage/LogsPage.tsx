@@ -9,14 +9,19 @@ import {
   Spin,
   Empty,
   Tooltip,
-  message
+  message,
+  Row,
+  Col,
+  Switch
 } from 'antd';
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
   ClearOutlined,
   DownloadOutlined,
-  FilterOutlined
+  FilterOutlined,
+  FileTextOutlined,
+  SyncOutlined
 } from '@ant-design/icons';
 import Layout from '../../components/Layout/Layout';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -161,13 +166,13 @@ const LogsPage: React.FC = () => {
   const getLevelColor = (level: string) => {
     switch (level.toUpperCase()) {
       case 'ERROR':
-        return 'red';
+        return 'error';
       case 'WARN':
-        return 'orange';
+        return 'warning';
       case 'INFO':
-        return 'blue';
+        return 'processing';
       case 'DEBUG':
-        return 'gray';
+        return 'default';
       default:
         return 'default';
     }
@@ -197,81 +202,133 @@ const LogsPage: React.FC = () => {
     color: mode === 'dark' ? '#c9d1d9' : '#24292f',
     padding: 16,
     borderRadius: 8,
-    height: 500,
+    height: 550,
     overflowY: 'auto',
     fontFamily: 'Consolas, Monaco, "Courier New", monospace',
     fontSize: 13,
-    lineHeight: 1.6,
+    lineHeight: 1.7,
     border: mode === 'dark' ? '1px solid #30363d' : '1px solid #d0d7de'
   };
 
+  const errorCount = logs.filter(l => l.level === 'ERROR').length;
+  const warnCount = logs.filter(l => l.level === 'WARN').length;
+  const infoCount = logs.filter(l => l.level === 'INFO').length;
+
   return (
     <Layout title="实时日志">
-      <Title level={2}>实时日志</Title>
-      <Paragraph type="secondary">
-        查看服务器运行日志，支持实时流式更新。
-      </Paragraph>
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Row justify="space-between" align="middle" gutter={[16, 16]}>
+          <Col>
+            <Title level={3} style={{ margin: 0 }}>
+              <FileTextOutlined style={{ marginRight: 8 }} />
+              实时日志
+            </Title>
+          </Col>
+          <Col>
+            <Space>
+              {!isStreaming ? (
+                <Button 
+                  type="primary" 
+                  icon={<PlayCircleOutlined />} 
+                  onClick={startStreaming}
+                >
+                  开始实时日志
+                </Button>
+              ) : (
+                <Button 
+                  icon={<PauseCircleOutlined />} 
+                  onClick={stopStreaming}
+                  danger
+                >
+                  停止实时日志
+                </Button>
+              )}
+            </Space>
+          </Col>
+        </Row>
 
-      <Card>
-        <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
-          <Space>
-            {!isStreaming ? (
-              <Button 
-                type="primary" 
-                icon={<PlayCircleOutlined />} 
-                onClick={startStreaming}
-              >
-                开始实时日志
-              </Button>
-            ) : (
-              <Button 
-                icon={<PauseCircleOutlined />} 
-                onClick={stopStreaming}
-                danger
-              >
-                停止实时日志
-              </Button>
-            )}
-            
-            <Button 
-              icon={<ClearOutlined />} 
-              onClick={clearLogs}
-            >
-              清除日志
-            </Button>
-            
-            <Button 
-              icon={<DownloadOutlined />} 
-              onClick={exportLogs}
-            >
-              导出日志
-            </Button>
-          </Space>
+        <Row gutter={16}>
+          <Col xs={24} sm={8}>
+            <Card size="small" bordered={false} style={{ background: 'transparent' }}>
+              <Text type="secondary">错误日志</Text>
+              <Title level={4} style={{ margin: 0, color: errorCount > 0 ? '#ff4d4f' : undefined }}>
+                {errorCount}
+              </Title>
+            </Card>
+          </Col>
+          <Col xs={24} sm={8}>
+            <Card size="small" bordered={false} style={{ background: 'transparent' }}>
+              <Text type="secondary">警告日志</Text>
+              <Title level={4} style={{ margin: 0, color: warnCount > 0 ? '#faad14' : undefined }}>
+                {warnCount}
+              </Title>
+            </Card>
+          </Col>
+          <Col xs={24} sm={8}>
+            <Card size="small" bordered={false} style={{ background: 'transparent' }}>
+              <Text type="secondary">信息日志</Text>
+              <Title level={4} style={{ margin: 0, color: '#1890ff' }}>
+                {infoCount}
+              </Title>
+            </Card>
+          </Col>
+        </Row>
 
-          <Space>
-            <FilterOutlined />
-            <Select 
-              value={levelFilter} 
-              onChange={setLevelFilter}
-              style={{ width: 120 }}
-            >
-              <Option value="all">全部级别</Option>
-              <Option value="ERROR">ERROR</Option>
-              <Option value="WARN">WARN</Option>
-              <Option value="INFO">INFO</Option>
-              <Option value="DEBUG">DEBUG</Option>
-            </Select>
-            
-            <Tooltip title={autoScroll ? '已开启自动滚动' : '已关闭自动滚动'}>
-              <Button 
-                type={autoScroll ? 'primary' : 'default'}
-                onClick={() => setAutoScroll(!autoScroll)}
-              >
-                自动滚动
-              </Button>
-            </Tooltip>
-          </Space>
-        </Space>
+        <Card size="small" bordered={false} style={{ background: 'transparent' }}>
+          <Row justify="space-between" align="middle" wrap gutter={[16, 16]}>
+            <Col>
+              <Space wrap>
+                <Button 
+                  icon={<SyncOutlined spin={loading} />}
+                  onClick={fetchLogs}
+                  loading={loading}
+                  size="small"
+                >
+                  刷新
+                </Button>
+                <Button 
+                  icon={<ClearOutlined />} 
+                  onClick={clearLogs}
+                  size="small"
+                >
+                  清除
+                </Button>
+                <Button 
+                  icon={<DownloadOutlined />} 
+                  onClick={exportLogs}
+                  size="small"
+                >
+                  导出
+                </Button>
+              </Space>
+            </Col>
+            <Col>
+              <Space wrap>
+                <FilterOutlined />
+                <Select 
+                  value={levelFilter} 
+                  onChange={setLevelFilter}
+                  style={{ width: 120 }}
+                  size="small"
+                >
+                  <Option value="all">全部级别</Option>
+                  <Option value="ERROR">ERROR</Option>
+                  <Option value="WARN">WARN</Option>
+                  <Option value="INFO">INFO</Option>
+                  <Option value="DEBUG">DEBUG</Option>
+                </Select>
+                
+                <Switch
+                  checkedChildren="自动滚动"
+                  unCheckedChildren="手动滚动"
+                  checked={autoScroll}
+                  onChange={setAutoScroll}
+                  size="small"
+                />
+              </Space>
+            </Col>
+          </Row>
+        </Card>
 
         <div 
           ref={logContainerRef}
@@ -279,23 +336,30 @@ const LogsPage: React.FC = () => {
         >
           {loading ? (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-              <Spin />
+              <Spin tip="加载日志中..." />
             </div>
           ) : filteredLogs.length === 0 ? (
             <Empty 
               description="暂无日志" 
-              style={{ marginTop: 100 }}
+              style={{ marginTop: 150 }}
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             />
           ) : (
             filteredLogs.map((log, index) => (
-              <div key={index} style={{ marginBottom: 4 }}>
-                <Text style={{ color: mode === 'dark' ? '#7ee787' : '#1a7f37', fontFamily: 'inherit' }}>
+              <div key={index} style={{ marginBottom: 2, display: 'flex', alignItems: 'flex-start' }}>
+                <Text 
+                  style={{ 
+                    color: mode === 'dark' ? '#7ee787' : '#1a7f37', 
+                    fontFamily: 'inherit',
+                    minWidth: 100,
+                    flexShrink: 0
+                  }}
+                >
                   [{formatTimestamp(log.timestamp)}]
                 </Text>
                 <Tag 
                   color={getLevelColor(log.level)} 
-                  style={{ marginLeft: 8, marginRight: 8 }}
+                  style={{ marginLeft: 8, marginRight: 8, minWidth: 55, textAlign: 'center' }}
                 >
                   {log.level}
                 </Tag>
@@ -304,7 +368,8 @@ const LogsPage: React.FC = () => {
                     color: log.level === 'ERROR' ? (mode === 'dark' ? '#f85149' : '#cf222e') : 
                            log.level === 'WARN' ? (mode === 'dark' ? '#d29922' : '#9a6700') : 
                            (mode === 'dark' ? '#c9d1d9' : '#24292f'),
-                    fontFamily: 'inherit'
+                    fontFamily: 'inherit',
+                    wordBreak: 'break-all'
                   }}
                 >
                   {log.message}
@@ -314,13 +379,18 @@ const LogsPage: React.FC = () => {
           )}
         </div>
 
-        <div style={{ marginTop: 8, textAlign: 'right' }}>
-          <Text type="secondary">
-            共 {filteredLogs.length} 条日志
-            {levelFilter !== 'all' && ` (筛选: ${levelFilter})`}
-          </Text>
+        <div style={{ textAlign: 'right' }}>
+          <Space>
+            <Tag color={isStreaming ? 'green' : 'default'}>
+              {isStreaming ? '实时连接中' : '未连接'}
+            </Tag>
+            <Text type="secondary">
+              共 {filteredLogs.length} 条日志
+              {levelFilter !== 'all' && ` (筛选: ${levelFilter})`}
+            </Text>
+          </Space>
         </div>
-      </Card>
+      </Space>
     </Layout>
   );
 };

@@ -11,9 +11,19 @@ import {
   Avatar,
   Spin,
   Alert,
-  Select
+  Select,
+  Divider,
+  message
 } from 'antd';
-import { CopyOutlined, EyeOutlined, EyeInvisibleOutlined, UserOutlined } from '@ant-design/icons';
+import { 
+  CopyOutlined, 
+  UserOutlined, 
+  ApiOutlined, 
+  KeyOutlined,
+  CheckCircleOutlined,
+  SendOutlined,
+  BookOutlined
+} from '@ant-design/icons';
 import Layout from '../../components/Layout/Layout';
 import { useNotification } from '../../components/Notification';
 
@@ -41,7 +51,6 @@ const AVAILABLE_MODELS = [
 ];
 
 const GuidePage: React.FC = () => {
-  const [showToken, setShowToken] = useState(false);
   const [backendUrl, setBackendUrl] = useState('');
   const [fullApiUrl, setFullApiUrl] = useState('');
   const [token, setToken] = useState('');
@@ -73,9 +82,9 @@ const GuidePage: React.FC = () => {
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      addNotification('已复制到剪贴板', 'success');
+      message.success('已复制到剪贴板');
     } catch (error) {
-      addNotification('复制失败', 'danger');
+      message.error('复制失败');
     }
   };
 
@@ -110,84 +119,229 @@ const GuidePage: React.FC = () => {
     }
   };
 
-  const CodeBlock: React.FC<{text: string}> = ({ text }) => (
-    <div style={{ position: 'relative', backgroundColor: '#282c34', padding: '16px', borderRadius: 8, color: 'white', fontFamily: 'monospace' }}>
+  const CodeBlock: React.FC<{text: string, language?: string}> = ({ text, language = 'bash' }) => (
+    <div 
+      style={{ 
+        position: 'relative', 
+        backgroundColor: '#282c34', 
+        padding: '16px', 
+        borderRadius: 8, 
+        color: '#abb2bf',
+        fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+        fontSize: 13,
+        overflow: 'auto'
+      }}
+    >
       <code>{text}</code>
-      <Button icon={<CopyOutlined />} onClick={() => copyToClipboard(text)} style={{ position: 'absolute', top: 8, right: 8 }} />
+      <Button 
+        icon={<CopyOutlined />} 
+        onClick={() => copyToClipboard(text)} 
+        style={{ position: 'absolute', top: 8, right: 8 }}
+        size="small"
+      />
     </div>
   );
 
   return (
-    <Layout title="OpenAI API配置教程">
-      <Title level={2}>OpenAI API配置指南</Title>
-      <Paragraph>要使用此中间人服务器，您需要将OpenAI客户端配置为使用以下API地址和认证Token。这样您的所有API请求将通过此服务器，并被记录下来供后续分析。</Paragraph>
-      
-      <Row gutter={[16, 24]}>
-        <Col span={24}>
-          <Card title="1. API地址">
-            <Input value={fullApiUrl} readOnly addonAfter={<Button icon={<CopyOutlined />} onClick={() => copyToClipboard(fullApiUrl)} />} />
-            <Text type="secondary" style={{ marginTop: 8, display: 'block' }}>在您的OpenAI客户端中，将baseURL设置为上述地址。</Text>
-          </Card>
-        </Col>
-        <Col span={24}>
-          <Card title="2. 认证Token">
-            <Input.Password 
-              value={token} 
-              readOnly 
-              visibilityToggle={{ onVisible: () => setShowToken(true), onInvisible: () => setShowToken(false) }}
-              addonAfter={
-                <Button icon={<CopyOutlined />} onClick={() => copyToClipboard(token)} />
+    <Layout title="配置教程">
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Title level={3} style={{ margin: 0 }}>
+          <BookOutlined style={{ marginRight: 8 }} />
+          OpenAI API 配置指南
+        </Title>
+        
+        <Alert
+          message="快速开始"
+          description="将您的OpenAI客户端配置为使用以下API地址和认证Token，所有API请求将通过此服务器并被记录下来供后续分析。"
+          type="info"
+          showIcon
+        />
+        
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={12}>
+            <Card 
+              title={
+                <Space>
+                  <ApiOutlined />
+                  <span>1. API 地址</span>
+                </Space>
               }
-            />
-            <Text type="secondary" style={{ marginTop: 8, display: 'block' }}>在您的OpenAI客户端中，使用此Token作为API密钥。</Text>
-          </Card>
-        </Col>
-        <Col span={24}>
-          <Card title="3. 验证API连接">
-            <Paragraph>您可以使用以下命令测试API连接：</Paragraph>
-            <CodeBlock text={`curl -X GET ${fullApiUrl}/models -H "Authorization: ${token}"`} />
-          </Card>
-        </Col>
-        <Col span={24}>
-          <Card title="4. 测试对话">
-            <Space style={{ marginBottom: 16 }}>
-              <Text>选择模型：</Text>
-              <Select
-                value={selectedModel}
-                onChange={setSelectedModel}
-                options={AVAILABLE_MODELS}
-                style={{ width: 200 }}
-                placeholder="选择模型"
-              />
-            </Space>
-            <List
-              dataSource={messages}
-              renderItem={item => (
-                <List.Item>
-                  <List.Item.Meta
-                    avatar={item.role === 'user' ? <Avatar icon={<UserOutlined />} /> : <Avatar>AI</Avatar>}
-                    title={item.role === 'user' ? '你' : 'AI助手'}
-                    description={item.content}
+              size="small"
+            >
+              <Input.Password 
+                value={fullApiUrl} 
+                readOnly 
+                visibilityToggle={false}
+                addonAfter={
+                  <Button 
+                    icon={<CopyOutlined />} 
+                    onClick={() => copyToClipboard(fullApiUrl)}
+                    size="small"
                   />
-                </List.Item>
-              )}
-              style={{ minHeight: 200, maxHeight: 400, overflowY: 'auto', marginBottom: 16, border: '1px solid #f0f0f0', padding: 16 }}
+                }
+              />
+              <Text type="secondary" style={{ marginTop: 8, display: 'block' }}>
+                在您的OpenAI客户端中，将 baseURL 设置为上述地址。
+              </Text>
+            </Card>
+          </Col>
+          
+          <Col xs={24} lg={12}>
+            <Card 
+              title={
+                <Space>
+                  <KeyOutlined />
+                  <span>2. 认证 Token</span>
+                </Space>
+              }
+              size="small"
+            >
+              <Input.Password 
+                value={token} 
+                readOnly 
+                visibilityToggle={false}
+                addonAfter={
+                  <Button 
+                    icon={<CopyOutlined />} 
+                    onClick={() => copyToClipboard(token)}
+                    size="small"
+                  />
+                }
+              />
+              <Text type="secondary" style={{ marginTop: 8, display: 'block' }}>
+                在您的OpenAI客户端中，使用此 Token 作为 API 密钥。
+              </Text>
+            </Card>
+          </Col>
+        </Row>
+
+        <Card 
+          title={
+            <Space>
+              <CheckCircleOutlined />
+              <span>3. 验证 API 连接</span>
+            </Space>
+          }
+          size="small"
+        >
+          <Paragraph>您可以使用以下命令测试API连接：</Paragraph>
+          <CodeBlock text={`curl -X GET ${fullApiUrl}/models -H "Authorization: ${token}"`} />
+        </Card>
+
+        <Card 
+          title={
+            <Space>
+              <SendOutlined />
+              <span>4. 测试对话</span>
+            </Space>
+          }
+          size="small"
+        >
+          <Space style={{ marginBottom: 16 }}>
+            <Text>选择模型：</Text>
+            <Select
+              value={selectedModel}
+              onChange={setSelectedModel}
+              options={AVAILABLE_MODELS}
+              style={{ width: 200 }}
+              placeholder="选择模型"
             />
-            {isLoading && <Spin />}
+          </Space>
+          
+          <div 
+            style={{ 
+              minHeight: 200, 
+              maxHeight: 400, 
+              overflowY: 'auto', 
+              marginBottom: 16, 
+              border: '1px solid #f0f0f0', 
+              borderRadius: 8,
+              padding: 16 
+            }}
+          >
+            {messages.length === 0 ? (
+              <Text type="secondary">发送消息开始测试...</Text>
+            ) : (
+              <List
+                dataSource={messages}
+                renderItem={item => (
+                  <List.Item style={{ border: 'none', padding: '8px 0' }}>
+                    <List.Item.Meta
+                      avatar={
+                        <Avatar 
+                          icon={item.role === 'user' ? <UserOutlined /> : undefined}
+                          style={{ 
+                            backgroundColor: item.role === 'user' ? '#1890ff' : '#52c41a'
+                          }}
+                        >
+                          {item.role === 'assistant' ? 'AI' : undefined}
+                        </Avatar>
+                      }
+                      title={item.role === 'user' ? '你' : 'AI助手'}
+                      description={item.content}
+                    />
+                  </List.Item>
+                )}
+              />
+            )}
+            {isLoading && (
+              <div style={{ textAlign: 'center', padding: 16 }}>
+                <Spin />
+              </div>
+            )}
+          </div>
+          
+          <Space.Compact style={{ width: '100%' }}>
             <Input.TextArea 
               rows={2}
               value={inputMessage}
               onChange={e => setInputMessage(e.target.value)}
               placeholder="输入消息..."
               disabled={isLoading}
-              onPressEnter={e => { if (!e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+              onPressEnter={e => { 
+                if (!e.shiftKey) { 
+                  e.preventDefault(); 
+                  sendMessage(); 
+                } 
+              }}
+              style={{ flex: 1 }}
             />
-            <Button type="primary" onClick={sendMessage} loading={isLoading} style={{ marginTop: 16 }}>发送</Button>
-          </Card>
-        </Col>
-      </Row>
+            <Button 
+              type="primary" 
+              icon={<SendOutlined />}
+              onClick={sendMessage} 
+              loading={isLoading}
+            >
+              发送
+            </Button>
+          </Space.Compact>
+        </Card>
+
+        <Divider />
+
+        <Card title="Python 示例代码" size="small">
+          <CodeBlock 
+            text={`from openai import OpenAI
+
+client = OpenAI(
+    api_key="${token.replace('Bearer ', '')}",
+    base_url="${fullApiUrl}"
+)
+
+response = client.chat.completions.create(
+    model="${selectedModel}",
+    messages=[
+        {"role": "user", "content": "你好"}
+    ]
+)
+
+print(response.choices[0].message.content)`}
+            language="python"
+          />
+        </Card>
+      </Space>
     </Layout>
   );
 };
 
-export default GuidePage; 
+export default GuidePage;

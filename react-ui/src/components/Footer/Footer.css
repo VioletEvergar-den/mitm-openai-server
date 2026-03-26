@@ -1,20 +1,39 @@
-/* 页脚样式 - 朴素简洁设计 */
 .footer {
-  background: #f8f9fa;
+  background: #ffffff;
   color: #7f8c8d;
-  padding: 20px 0;
-  margin-top: auto;
-  border-top: 1px solid #e9ecef;
+  padding: 16px 0;
+  border-top: 1px solid #f0f0f0;
+}
+
+.footer-dark {
+  background: #141414;
+  border-top: 1px solid #303030;
+}
+
+.footer-dark .footer-link {
+  color: #ffffffd9;
+}
+
+.footer-dark .footer-link:hover {
+  color: #40a9ff;
+}
+
+.footer-dark .footer-divider {
+  color: #424242;
+}
+
+.footer-dark .footer-copyright {
+  color: #ffffff73;
 }
 
 .footer-content {
-  max-width: 1280px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 32px;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   text-align: center;
 }
 
@@ -29,17 +48,12 @@
   gap: 4px;
 }
 
-.footer-link::before {
-  content: '🔗';
-  font-size: 12px;
-}
-
 .footer-link:hover {
-  color: #3498db;
+  color: #1890ff;
 }
 
 .footer-divider {
-  color: #bdc3c7;
+  color: #d9d9d9;
   font-size: 14px;
   margin: 0 4px;
 }
@@ -48,20 +62,11 @@
   color: #7f8c8d;
   font-size: 14px;
   font-weight: 400;
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
 
-.footer-copyright::before {
-  content: '©';
-  font-size: 14px;
-}
-
-/* 响应式设计 */
 @media (max-width: 768px) {
   .footer {
-    padding: 16px 0;
+    padding: 12px 0;
   }
   
   .footer-content {
@@ -82,41 +87,3 @@
     display: none;
   }
 }
-
-@media (max-width: 480px) {
-  .footer-content {
-    padding: 0 12px;
-  }
-  
-  .footer-link {
-    font-size: 12px;
-  }
-  
-  .footer-copyright {
-    font-size: 12px;
-  }
-}
-
-/* 高对比度模式 */
-@media (prefers-contrast: high) {
-  .footer {
-    background: #000;
-    border-top: 2px solid #fff;
-  }
-  
-  .footer-link {
-    border: 1px solid rgba(255, 255, 255, 0.5);
-  }
-  
-  .footer-link:hover,
-  .footer-link:focus {
-    border-color: #fff;
-    background: #333;
-  }
-}
-
-/* 聚焦状态 */
-.footer-link:focus {
-  outline: 2px solid rgba(59, 130, 246, 0.5);
-  outline-offset: 2px;
-} 
