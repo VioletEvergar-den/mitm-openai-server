@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/llm-sec/mitm-openai-server/pkg/server"
 	"github.com/llm-sec/mitm-openai-server/pkg/storage"
+	"github.com/llm-sec/mitm-openai-server/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -232,17 +233,45 @@ func runServer() {
 	// 获取UI配置
 	serverConfig := apiServer.GetConfig()
 
+	// 获取本机IP地址
+	privateIPs := utils.GetPrivateIPs()
+	publicIPs := utils.GetPublicIPs()
+
 	// 精简登录信息显示 - 数据库版本
 	fmt.Println()
 	fmt.Printf("%s┌─────────────────────────────────────────────────┐%s\n", colorGreen+colorBold, colorReset)
 	fmt.Printf("%s│%s%s            MITM OpenAI Server 已启动            %s%s│%s\n", colorGreen+colorBold, colorReset, colorWhite+colorBold, colorReset, colorGreen+colorBold, colorReset)
 	fmt.Printf("%s│%s%s              (多用户数据库版本)                %s%s│%s\n", colorGreen+colorBold, colorReset, colorCyan, colorReset, colorGreen+colorBold, colorReset)
 	fmt.Printf("%s└─────────────────────────────────────────────────┘%s\n", colorGreen+colorBold, colorReset)
-	fmt.Printf("登录地址: %s%shttp://localhost%s/ui/login%s\n", colorBlue+colorBold, addr, colorReset, colorReset)
-	fmt.Printf("用户名:   %s%s%s\n", colorYellow+colorBold, serverConfig.UIUsername, colorReset)
-	fmt.Printf("密码:     %s%s%s\n", colorYellow+colorBold, serverConfig.UIPassword, colorReset)
-	fmt.Printf("数据库:   %s%s/mitm_server.db%s\n", colorCyan, absDataDir, colorReset)
-	fmt.Printf("存储模式: %s多用户隔离 (SQLite)%s\n", colorGreen+colorBold, colorReset)
+	fmt.Println()
+	fmt.Printf("%s%s登录地址:%s\n", colorBold, colorWhite, colorReset)
+	fmt.Printf("  %s本地访问:%s   http://localhost:%d/ui/login\n", colorBlue, colorReset, port)
+
+	if len(privateIPs) > 0 {
+		fmt.Printf("  %s内网访问:%s   ", colorGreen, colorReset)
+		for i, ip := range privateIPs {
+			if i > 0 {
+				fmt.Printf("              ")
+			}
+			fmt.Printf("http://%s:%d/ui/login\n", ip, port)
+		}
+	}
+
+	if len(publicIPs) > 0 {
+		fmt.Printf("  %s公网访问:%s   ", colorYellow, colorReset)
+		for i, ip := range publicIPs {
+			if i > 0 {
+				fmt.Printf("              ")
+			}
+			fmt.Printf("http://%s:%d/ui/login\n", ip, port)
+		}
+	}
+
+	fmt.Println()
+	fmt.Printf("%s用户名:%s   %s%s%s\n", colorBold, colorReset, colorYellow+colorBold, serverConfig.UIUsername, colorReset)
+	fmt.Printf("%s密码:%s     %s%s%s\n", colorBold, colorReset, colorYellow+colorBold, serverConfig.UIPassword, colorReset)
+	fmt.Printf("%s数据库:%s   %s%s/mitm_server.db%s\n", colorBold, colorReset, colorCyan, absDataDir, colorReset)
+	fmt.Printf("%s存储模式:%s %s多用户隔离 (SQLite)%s\n", colorBold, colorReset, colorGreen+colorBold, colorReset)
 	fmt.Println()
 	fmt.Printf("%s请使用上述凭据登录系统，监控和分析OpenAI API请求。%s\n", colorWhite, colorReset)
 	fmt.Printf("%s每个用户的数据完全隔离，支持多用户同时使用。%s\n", colorGreen, colorReset)
