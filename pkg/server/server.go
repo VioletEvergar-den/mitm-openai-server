@@ -10,16 +10,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/llm-sec/mitm-openai-server/pkg/api"
 	"github.com/llm-sec/mitm-openai-server/pkg/openai"
-	"github.com/llm-sec/mitm-openai-server/pkg/storage"
 )
 
 type Server struct {
-	config         api.ServerConfig
-	router         *gin.Engine
-	uiServer       api.UIServerInterface
-	openaiHandler  *openai.Handler
-	openaiService  openai.Service
-	defaultUserID  int64
+	config        api.ServerConfig
+	router        *gin.Engine
+	uiServer      api.UIServerInterface
+	openaiHandler *openai.Handler
+	openaiService openai.Service
+	defaultUserID int64
+	storagePath   string
 }
 
 func NewServerWithConfig(config api.ServerConfig) *Server {
