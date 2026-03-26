@@ -800,9 +800,7 @@ func (s *UIServer) SaveProxyConfig(c *gin.Context) {
 		if configReq.Token != "" && configReq.Token != "••••••••" {
 			s.config.TargetToken = configReq.Token
 		}
-		if configReq.ModelMapping != nil {
-			s.config.ModelMapping = configReq.ModelMapping
-		}
+		s.config.ModelMapping = configReq.ModelMapping
 
 		newConfig := openai.Config{
 			ProxyMode:      s.config.ProxyMode,

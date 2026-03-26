@@ -86,7 +86,7 @@ const SettingsPage: React.FC = () => {
       });
       const configToSave = {
         ...values,
-        modelMapping: Object.keys(mappingRecord).length > 0 ? mappingRecord : undefined
+        modelMapping: mappingRecord
       };
       const success = await apiService.saveProxyConfig(configToSave);
       if (success) {

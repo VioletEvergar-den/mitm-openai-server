@@ -298,7 +298,7 @@ func (s *proxyService) addAuthHeader(req *http.Request) {
 // applyModelMapping 应用模型ID映射
 // 将请求体中的模型名称替换为配置的实际模型ID
 func (s *proxyService) applyModelMapping(body []byte) []byte {
-	if len(s.config.ModelMapping) == 0 || len(body) == 0 {
+	if len(body) == 0 {
 		return body
 	}
 
@@ -308,14 +308,18 @@ func (s *proxyService) applyModelMapping(body []byte) []byte {
 	}
 
 	if model, ok := reqBody["model"].(string); ok {
-		if actualModel, exists := s.config.ModelMapping[model]; exists && actualModel != "" {
-			reqBody["model"] = actualModel
-			newBody, err := json.Marshal(reqBody)
-			if err != nil {
-				return body
+		if s.config.ModelMapping != nil {
+			if actualModel, exists := s.config.ModelMapping[model]; exists && actualModel != "" {
+				fmt.Printf("[ModelMapping] 映射模型: %s -> %s\n", model, actualModel)
+				reqBody["model"] = actualModel
+				newBody, err := json.Marshal(reqBody)
+				if err != nil {
+					return body
+				}
+				return newBody
 			}
-			return newBody
 		}
+		fmt.Printf("[ModelMapping] 未找到模型 '%s' 的映射，使用原始模型名\n", model)
 	}
 
 	return body
@@ -324,4 +328,5 @@ func (s *proxyService) applyModelMapping(body []byte) []byte {
 // UpdateConfig 更新服务配置
 func (s *proxyService) UpdateConfig(config Config) {
 	s.config = config
+	fmt.Printf("[ProxyService] 配置已更新, ModelMapping: %v\n", config.ModelMapping)
 }
