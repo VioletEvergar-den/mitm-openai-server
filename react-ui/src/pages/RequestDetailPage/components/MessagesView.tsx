@@ -18,16 +18,26 @@ const tryBase64Decode = (str: string): string => {
     return str;
   }
   
-  if (!/^[A-Za-z0-9+/=]+$/.test(str) || str.length < 10) {
+  const trimmed = str.trim();
+  
+  if (!/^[A-Za-z0-9+/=]+$/.test(trimmed) || trimmed.length < 10) {
     return str;
   }
   
   try {
-    const decoded = atob(str);
-    if (decoded && /^[\x20-\x7E\u4e00-\u9fa5\u3000-\u303F\uFF00-\uFFEF\s]+$/.test(decoded)) {
+    const binaryString = atob(trimmed);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const decoder = new TextDecoder('utf-8');
+    const decoded = decoder.decode(bytes);
+    
+    if (decoded && decoded.length > 0) {
       return decoded;
     }
   } catch (e) {
+    console.log('Base64 decode failed:', e);
   }
   
   return str;
