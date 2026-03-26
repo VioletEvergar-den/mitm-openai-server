@@ -10,8 +10,12 @@ import {
   Spin,
   Space,
   Row,
-  Col
+  Col,
+  Divider,
+  Table,
+  Popconfirm
 } from 'antd';
+import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import Layout from '../../components/Layout/Layout';
 import { ProxyConfig } from '../../types';
 import { apiService } from '../../services/api';
@@ -20,11 +24,20 @@ import { useNotification } from '../../components/Notification/Notification';
 const { Title, Paragraph, Text, Link } = Typography;
 const { Option } = Select;
 
+interface ModelMappingItem {
+  key: string;
+  customModel: string;
+  actualModel: string;
+}
+
 const SettingsPage: React.FC = () => {
   const [form] = Form.useForm();
   const [proxyConfig, setProxyConfig] = useState<ProxyConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [modelMappings, setModelMappings] = useState<ModelMappingItem[]>([]);
+  const [newCustomModel, setNewCustomModel] = useState('');
+  const [newActualModel, setNewActualModel] = useState('');
   const { addNotification } = useNotification();
   
   const isProxyEnabled = Form.useWatch('enabled', form);
@@ -37,6 +50,16 @@ const SettingsPage: React.FC = () => {
         if (config) {
           setProxyConfig(config);
           form.setFieldsValue(config);
+          if (config.modelMapping) {
+            const mappings: ModelMappingItem[] = Object.entries(config.modelMapping).map(
+              ([custom, actual], index) => ({
+                key: `mapping-${index}`,
+                customModel: custom,
+                actualModel: actual
+              })
+            );
+            setModelMappings(mappings);
+          }
         }
       } catch (error) {
         addNotification('加载代理配置失败', 'danger');
@@ -50,10 +73,20 @@ const SettingsPage: React.FC = () => {
   const handleFinish = async (values: ProxyConfig) => {
     setSaving(true);
     try {
-      const success = await apiService.saveProxyConfig(values);
+      const mappingRecord: Record<string, string> = {};
+      modelMappings.forEach(item => {
+        if (item.customModel && item.actualModel) {
+          mappingRecord[item.customModel] = item.actualModel;
+        }
+      });
+      const configToSave = {
+        ...values,
+        modelMapping: Object.keys(mappingRecord).length > 0 ? mappingRecord : undefined
+      };
+      const success = await apiService.saveProxyConfig(configToSave);
       if (success) {
         addNotification('代理设置已保存', 'success');
-        setProxyConfig(values);
+        setProxyConfig(configToSave);
       } else {
         addNotification('保存代理设置失败', 'danger');
       }
@@ -67,6 +100,55 @@ const SettingsPage: React.FC = () => {
   const handleQuickConfig = (url: string) => {
     form.setFieldsValue({ targetURL: url });
   };
+
+  const handleAddMapping = () => {
+    if (!newCustomModel.trim() || !newActualModel.trim()) {
+      addNotification('请填写完整的模型映射信息', 'danger');
+      return;
+    }
+    const newItem: ModelMappingItem = {
+      key: `mapping-${Date.now()}`,
+      customModel: newCustomModel.trim(),
+      actualModel: newActualModel.trim()
+    };
+    setModelMappings([...modelMappings, newItem]);
+    setNewCustomModel('');
+    setNewActualModel('');
+  };
+
+  const handleDeleteMapping = (key: string) => {
+    setModelMappings(modelMappings.filter(item => item.key !== key));
+  };
+
+  const mappingColumns = [
+    {
+      title: '自定义模型名',
+      dataIndex: 'customModel',
+      key: 'customModel',
+      width: '45%',
+    },
+    {
+      title: '实际模型ID',
+      dataIndex: 'actualModel',
+      key: 'actualModel',
+      width: '45%',
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: '10%',
+      render: (_: any, record: ModelMappingItem) => (
+        <Popconfirm
+          title="确定删除此映射?"
+          onConfirm={() => handleDeleteMapping(record.key)}
+          okText="确定"
+          cancelText="取消"
+        >
+          <Button type="text" danger icon={<DeleteOutlined />} />
+        </Popconfirm>
+      ),
+    },
+  ];
 
   return (
     <Layout title="系统设置">
@@ -139,6 +221,52 @@ const SettingsPage: React.FC = () => {
                 return null;
               }}
             </Form.Item>
+
+            <Divider>Model ID 映射</Divider>
+            
+            <Paragraph type="secondary">
+              配置模型名称映射，代理转发时将请求中的模型名替换为实际的模型ID。
+              例如：将 <Text code>gpt-5.4</Text> 映射到 <Text code>abab6.5-chat</Text>
+            </Paragraph>
+
+            <div style={{ marginBottom: 16 }}>
+              <Space.Compact style={{ width: '100%' }}>
+                <Input
+                  placeholder="自定义模型名 (如: gpt-5.4)"
+                  value={newCustomModel}
+                  onChange={(e) => setNewCustomModel(e.target.value)}
+                  disabled={!isProxyEnabled}
+                  style={{ width: '40%' }}
+                />
+                <Input
+                  placeholder="实际模型ID (如: abab6.5-chat)"
+                  value={newActualModel}
+                  onChange={(e) => setNewActualModel(e.target.value)}
+                  disabled={!isProxyEnabled}
+                  style={{ width: '40%' }}
+                />
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={handleAddMapping}
+                  disabled={!isProxyEnabled}
+                >
+                  添加
+                </Button>
+              </Space.Compact>
+            </div>
+
+            {modelMappings.length > 0 && (
+              <Table
+                dataSource={modelMappings}
+                columns={mappingColumns}
+                pagination={false}
+                size="small"
+                bordered
+              />
+            )}
+            
+            <Divider />
             
             <Form.Item>
               <Button type="primary" htmlType="submit" loading={saving}>

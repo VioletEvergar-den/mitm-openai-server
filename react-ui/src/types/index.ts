@@ -34,6 +34,7 @@ export interface ProxyConfig {
   password?: string;
   token?: string;
   storagePath?: string;
+  modelMapping?: Record<string, string>;
 }
 
 // 认证状态
