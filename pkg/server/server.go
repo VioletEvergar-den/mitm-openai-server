@@ -47,11 +47,9 @@ func NewServerWithConfig(config api.ServerConfig) *Server {
 		ModelMapping:   config.ModelMapping,
 	})
 
-	s.openaiHandler = openai.NewHandler(config.Storage, s.openaiService)
+	s.openaiHandler = openai.InitGlobalHandler(config.Storage, s.openaiService)
 
 	s.defaultUserID = s.getDefaultUserID()
-
-	openai.InitGlobalHandler(config.Storage, s.openaiService)
 
 	s.uiServer = api.NewUIServer(config.Storage, config, s.openaiService)
 

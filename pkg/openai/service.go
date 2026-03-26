@@ -34,8 +34,10 @@ var globalHandler *Handler
 
 // InitGlobalHandler 初始化全局处理器
 // 这个函数应该在服务启动时被调用一次
-func InitGlobalHandler(storage storage.Storage, service Service) {
+// 返回创建的Handler实例，供调用方使用
+func InitGlobalHandler(storage storage.Storage, service Service) *Handler {
 	globalHandler = NewHandler(storage, service)
+	return globalHandler
 }
 
 // UpdateGlobalHandlerConfig 更新全局处理器的服务配置
