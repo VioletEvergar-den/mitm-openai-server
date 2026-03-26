@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Card, Typography, Tag, Empty, Divider, Space } from 'antd';
+import { Card, Typography, Tag, Empty, Divider, Space, Alert } from 'antd';
 import { UserOutlined, RobotOutlined, SettingOutlined } from '@ant-design/icons';
 
 const { Text, Paragraph } = Typography;
@@ -13,33 +13,91 @@ interface MessagesViewProps {
   requestBody: any;
 }
 
-const parseRequestBody = (body: any): { model: string; messages: Message[] } => {
+const tryBase64Decode = (str: string): string => {
+  if (!str || typeof str !== 'string') {
+    return str;
+  }
+  
+  if (!/^[A-Za-z0-9+/=]+$/.test(str) || str.length < 10) {
+    return str;
+  }
+  
+  try {
+    const decoded = atob(str);
+    if (decoded && /^[\x20-\x7E\u4e00-\u9fa5\u3000-\u303F\uFF00-\uFFEF\s]+$/.test(decoded)) {
+      return decoded;
+    }
+  } catch (e) {
+  }
+  
+  return str;
+};
+
+const parseRequestBody = (body: any): { model: string; messages: Message[]; rawBody: any } => {
   let parsed = body;
 
   if (typeof body === 'string') {
+    const decodedBody = tryBase64Decode(body);
     try {
-      parsed = JSON.parse(body);
+      parsed = JSON.parse(decodedBody);
     } catch (e) {
       console.error('Failed to parse request body string:', e);
-      return { model: '未知模型', messages: [] };
+      return { model: '未知模型', messages: [], rawBody: body };
     }
   }
 
   if (!parsed || typeof parsed !== 'object') {
-    return { model: '未知模型', messages: [] };
+    return { model: '未知模型', messages: [], rawBody: body };
   }
 
   const model = parsed.model || '未知模型';
   const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
 
-  return { model, messages };
+  return { model, messages, rawBody: parsed };
 };
 
 const MessagesView: React.FC<MessagesViewProps> = ({ requestBody }) => {
-  const { model, messages } = useMemo(() => parseRequestBody(requestBody), [requestBody]);
+  const { model, messages, rawBody } = useMemo(() => parseRequestBody(requestBody), [requestBody]);
+
+  if (!requestBody) {
+    return null;
+  }
 
   if (messages.length === 0) {
-    return null;
+    return (
+      <Card
+        size="small"
+        title={
+          <Space>
+            <Text strong>请求体数据</Text>
+            <Text type="secondary">(未识别为对话格式)</Text>
+          </Space>
+        }
+        style={{ marginBottom: 16 }}
+      >
+        <Alert
+          message="无法解析为对话消息格式"
+          description="请求体不是标准的 OpenAI Chat 格式，请查看下方的原始请求体"
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+        />
+        <Paragraph
+          style={{
+            margin: 0,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            backgroundColor: '#f5f5f5',
+            padding: 12,
+            borderRadius: 4,
+            fontFamily: 'monospace',
+            fontSize: 12
+          }}
+        >
+          {typeof rawBody === 'object' ? JSON.stringify(rawBody, null, 2) : String(rawBody)}
+        </Paragraph>
+      </Card>
+    );
   }
 
   const getRoleIcon = (role: string) => {
@@ -68,6 +126,7 @@ const MessagesView: React.FC<MessagesViewProps> = ({ requestBody }) => {
 
   const renderContent = (content: string | Array<any>) => {
     if (typeof content === 'string') {
+      const decodedContent = tryBase64Decode(content);
       return (
         <Paragraph
           style={{
@@ -77,7 +136,7 @@ const MessagesView: React.FC<MessagesViewProps> = ({ requestBody }) => {
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}
         >
-          {content || <Text type="secondary">（空内容）</Text>}
+          {decodedContent || <Text type="secondary">（空内容）</Text>}
         </Paragraph>
       );
     }
@@ -87,6 +146,7 @@ const MessagesView: React.FC<MessagesViewProps> = ({ requestBody }) => {
         <Space direction="vertical" style={{ width: '100%' }}>
           {content.map((part, idx) => {
             if (part.type === 'text') {
+              const decodedText = tryBase64Decode(part.text || '');
               return (
                 <Paragraph
                   key={idx}
@@ -96,7 +156,7 @@ const MessagesView: React.FC<MessagesViewProps> = ({ requestBody }) => {
                     wordBreak: 'break-word'
                   }}
                 >
-                  {part.text}
+                  {decodedText}
                 </Paragraph>
               );
             }
