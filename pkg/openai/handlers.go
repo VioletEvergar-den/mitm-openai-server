@@ -188,6 +188,18 @@ func (h *Handler) HandleRequest(c *gin.Context) {
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	}
 
+	// 检查是否是流式请求
+	isStream := false
+	if len(bodyBytes) > 0 {
+		var reqBody map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &reqBody); err == nil {
+			if stream, ok := reqBody["stream"].(bool); ok && stream {
+				isStream = true
+				fmt.Printf("[HandleRequest] 检测到流式请求\n")
+			}
+		}
+	}
+
 	// 收集请求头
 	headers := make(map[string]string)
 	for key, values := range c.Request.Header {
@@ -202,6 +214,12 @@ func (h *Handler) HandleRequest(c *gin.Context) {
 		if len(values) > 0 {
 			queryParams[key] = values[0]
 		}
+	}
+
+	// 如果是流式请求，使用流式处理
+	if isStream {
+		h.handleStreamRequest(c, method, path, headers, queryParams, bodyBytes)
+		return
 	}
 
 	// 使用OpenAI服务处理请求
@@ -270,6 +288,83 @@ func (h *Handler) HandleRequest(c *gin.Context) {
 
 	// 返回响应
 	c.JSON(statusCode, responseBody)
+}
+
+// handleStreamRequest 处理流式请求
+func (h *Handler) handleStreamRequest(c *gin.Context, method, path string, headers, queryParams map[string]string, bodyBytes []byte) {
+	startTime := time.Now()
+
+	// 获取用户信息
+	userID, username := h.getUserFromContext(c)
+
+	// 设置SSE响应头
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("Access-Control-Allow-Origin", "*")
+
+	// 检查服务是否支持流式处理
+	proxySvc, ok := h.openaiService.(*proxyService)
+	if !ok {
+		// 如果不是代理服务，返回错误
+		c.SSEvent("error", map[string]string{"error": "流式请求仅支持代理模式"})
+		return
+	}
+
+	// 使用流式处理
+	dataChan, errChan := proxySvc.StreamHandleRequest(method, path, headers, queryParams, bodyBytes)
+
+	// 收集完整响应用于保存
+	var fullResponse []byte
+
+	for {
+		select {
+		case data, ok := <-dataChan:
+			if !ok {
+				// 数据通道关闭，流结束
+				// 保存请求记录
+				response := &storage.ProxyResponse{
+					StatusCode: 200,
+					Headers:    map[string]string{"Content-Type": "text/event-stream"},
+					Body:       string(fullResponse),
+					Latency:    time.Since(startTime).Milliseconds(),
+				}
+
+				request := &storage.Request{
+					ID:        uuid.New().String(),
+					UserID:    userID,
+					Method:    method,
+					Path:      path,
+					Timestamp: time.Now(),
+					Headers:   headers,
+					Query:     queryParams,
+					Body:      bodyBytes,
+					ClientIP:  utils.GetClientIP(c.Request),
+					Response:  response,
+					Metadata: map[string]interface{}{
+						"source":     "openai_handler_stream",
+						"user_id":    userID,
+						"username":   username,
+						"latency_ms": time.Since(startTime).Milliseconds(),
+					},
+				}
+
+				h.SaveRequest(userID, request)
+				return
+			}
+			// 写入数据到客户端
+			c.Writer.Write(data)
+			c.Writer.Flush()
+			fullResponse = append(fullResponse, data...)
+
+		case err := <-errChan:
+			if err != nil {
+				fmt.Printf("[HandleStreamRequest] 错误: %v\n", err)
+				c.SSEvent("error", map[string]string{"error": err.Error()})
+			}
+			return
+		}
+	}
 }
 
 // SaveRequest 保存请求记录到存储（支持用户隔离）

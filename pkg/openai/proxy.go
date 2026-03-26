@@ -358,3 +358,91 @@ func (s *proxyService) UpdateConfig(config Config) {
 	s.config = config
 	fmt.Printf("[ProxyService] 配置已更新, ModelMapping: %v\n", config.ModelMapping)
 }
+
+// StreamHandleRequest 处理流式API请求（SSE）
+// 返回通道以实时发送数据
+func (s *proxyService) StreamHandleRequest(method, path string, headers, queryParams map[string]string, body []byte) (<-chan []byte, <-chan error) {
+	dataChan := make(chan []byte, 1)
+	errChan := make(chan error, 1)
+
+	go func() {
+		defer close(dataChan)
+		defer close(errChan)
+
+		fmt.Printf("[ProxyService] 开始流式请求: %s %s\n", method, path)
+
+		// 检查目标URL是否配置
+		if s.config.TargetURL == "" {
+			errChan <- fmt.Errorf("未配置目标OpenAI API URL")
+			return
+		}
+
+		// 标准化路径
+		if !strings.HasPrefix(path, "/") {
+			path = "/" + path
+		}
+
+		// 应用模型ID映射
+		body = s.applyModelMapping(body)
+
+		// 构建目标URL
+		targetURL := s.buildURL(path)
+
+		// 添加查询参数
+		if len(queryParams) > 0 {
+			queryStrings := make([]string, 0, len(queryParams))
+			for k, v := range queryParams {
+				queryStrings = append(queryStrings, fmt.Sprintf("%s=%s", k, v))
+			}
+			targetURL += "?" + strings.Join(queryStrings, "&")
+		}
+
+		// 创建请求
+		req, err := http.NewRequest(method, targetURL, bytes.NewBuffer(body))
+		if err != nil {
+			errChan <- fmt.Errorf("创建代理请求失败: %v", err)
+			return
+		}
+
+		// 添加请求头
+		for k, v := range headers {
+			if strings.EqualFold(k, "Content-Length") || strings.EqualFold(k, "Host") {
+				continue
+			}
+			req.Header.Set(k, v)
+		}
+
+		// 确保Content-Type
+		if len(body) > 0 && req.Header.Get("Content-Type") == "" {
+			req.Header.Set("Content-Type", "application/json")
+		}
+
+		// 添加认证
+		s.addAuthHeader(req)
+
+		// 发送请求
+		fmt.Printf("[ProxyService] 发送流式请求到: %s\n", targetURL)
+		resp, err := s.httpClient.Do(req)
+		if err != nil {
+			errChan <- fmt.Errorf("代理请求失败: %v", err)
+			return
+		}
+		defer resp.Body.Close()
+
+		// 读取响应
+		buffer := make([]byte, 4096)
+		for {
+			n, err := resp.Body.Read(buffer)
+			if n > 0 {
+				dataChan <- buffer[:n]
+			}
+			if err != nil {
+				break
+			}
+		}
+
+		fmt.Printf("[ProxyService] 流式请求完成\n")
+	}()
+
+	return dataChan, errChan
+}
