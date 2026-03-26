@@ -17,10 +17,10 @@ import (
 
 // Handler 处理OpenAI API请求的处理器
 type Handler struct {
-	storage        storage.Storage
-	openaiService  Service
-	defaultUserID  int64
-	config         Config
+	storage       storage.Storage
+	openaiService Service
+	defaultUserID int64
+	config        Config
 }
 
 // NewHandler 创建一个新的OpenAI处理器
@@ -38,7 +38,7 @@ func NewHandler(storage storage.Storage, openaiService Service) *Handler {
 // UpdateServiceConfig 更新服务配置，必要时切换服务实例
 func (h *Handler) UpdateServiceConfig(config Config) {
 	h.config = config
-	
+
 	if config.ProxyMode && config.TargetURL != "" {
 		if h.openaiService.Name() != "OpenAI API Proxy" {
 			fmt.Println("切换到代理模式...")
@@ -153,6 +153,12 @@ func (h *Handler) HandleRequest(c *gin.Context) {
 	// 获取请求方法和路径
 	method := c.Request.Method
 	path := c.Request.URL.Path
+	clientIP := utils.GetClientIP(c.Request)
+
+	fmt.Printf("========================================\n")
+	fmt.Printf("[HandleRequest] 收到请求: %s %s from %s\n", method, path, clientIP)
+	fmt.Printf("[HandleRequest] 当前服务模式: %s\n", h.openaiService.Name())
+	fmt.Printf("========================================\n")
 
 	fmt.Printf("DEBUG: 原始路径: %s\n", path)
 

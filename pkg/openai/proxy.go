@@ -26,9 +26,9 @@ func init() {
 
 // newProxyService 创建代理OpenAI服务
 func newProxyService(config Config) Service {
-	// 创建HTTP客户端
+	// 创建HTTP客户端，设置较长的超时时间（AI请求可能需要几分钟）
 	client := &http.Client{
-		Timeout: 30 * time.Second, // 设置适当的超时时间
+		Timeout: 10 * time.Minute, // AI请求可能需要较长时间
 	}
 
 	// 初始化支持的API
@@ -125,8 +125,11 @@ func (s *proxyService) ServeOpenAISpec(c *gin.Context) {
 
 // HandleRequest 处理API请求并代理转发
 func (s *proxyService) HandleRequest(method, path string, headers, queryParams map[string]string, body []byte) (int, map[string]string, interface{}, error) {
+	fmt.Printf("[ProxyService] 开始处理请求: %s %s\n", method, path)
+
 	// 检查目标URL是否配置
 	if s.config.TargetURL == "" {
+		fmt.Printf("[ProxyService] 错误: 未配置目标URL\n")
 		return http.StatusBadRequest, map[string]string{"Content-Type": "application/json"}, ErrorResp{
 			Message: "未配置目标OpenAI API URL",
 			Type:    "configuration_error",
@@ -167,6 +170,8 @@ func (s *proxyService) HandleRequest(method, path string, headers, queryParams m
 		targetURL += "?" + strings.Join(queryStrings, "&")
 	}
 
+	fmt.Printf("[ProxyService] 目标URL: %s\n", targetURL)
+
 	// 创建请求
 	req, err := http.NewRequest(method, targetURL, bytes.NewBuffer(body))
 	if err != nil {
@@ -194,14 +199,18 @@ func (s *proxyService) HandleRequest(method, path string, headers, queryParams m
 	s.addAuthHeader(req)
 
 	// 发送请求
+	fmt.Printf("[ProxyService] 发送请求到目标服务器...\n")
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
+		fmt.Printf("[ProxyService] 请求失败: %v\n", err)
 		return http.StatusBadGateway, map[string]string{"Content-Type": "application/json"}, ErrorResp{
 			Message: "代理请求失败: " + err.Error(),
 			Type:    "proxy_error",
 		}, err
 	}
 	defer resp.Body.Close()
+
+	fmt.Printf("[ProxyService] 收到响应: HTTP %d\n", resp.StatusCode)
 
 	// 读取响应
 	respBody, err := io.ReadAll(resp.Body)
