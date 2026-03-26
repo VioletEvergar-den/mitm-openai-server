@@ -10,33 +10,31 @@ const Layout: React.FC<{
   title?: string;
 }> = ({ children, title }) => {
   const {
-    token: { colorBgContainer, borderRadiusLG },
+    token: { colorBgContainer, borderRadiusLG, colorBgLayout },
   } = theme.useToken();
 
-  // 设置页面标题
   React.useEffect(() => {
     if (title) {
-      document.title = `${title} - 中间人OpenAI API服务器`;
+      document.title = `${title} - OpenAI API 代理`;
     } else {
-      document.title = '中间人OpenAI API服务器';
+      document.title = 'OpenAI API 代理';
     }
   }, [title]);
 
   return (
-    <AntLayout>
+    <AntLayout style={{ minHeight: '100vh', background: colorBgLayout }}>
       <Navbar />
       <Content style={{ 
-        padding: '0 48px', 
-        marginTop: 64, // 导航栏高度
-        minHeight: 'calc(100vh - 64px)' // 减去导航栏高度
+        padding: '24px 48px', 
+        marginTop: 64,
+        minHeight: 'calc(100vh - 64px)'
       }}>
         <div 
           style={{ 
             padding: 24, 
-            marginTop: 24,
             background: colorBgContainer, 
             borderRadius: borderRadiusLG,
-            minHeight: 'calc(100vh - 200px)'
+            minHeight: 'calc(100vh - 180px)'
           }}
         >
           {children}
@@ -52,4 +50,4 @@ const Layout: React.FC<{
   );
 };
 
-export default Layout; 
+export default Layout;

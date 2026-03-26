@@ -8,7 +8,8 @@ import {
   Select,
   Spin,
   Empty,
-  Tooltip
+  Tooltip,
+  message
 } from 'antd';
 import {
   PlayCircleOutlined,
@@ -18,7 +19,7 @@ import {
   FilterOutlined
 } from '@ant-design/icons';
 import Layout from '../../components/Layout/Layout';
-import { useNotification } from '../../components/Notification/Notification';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -37,7 +38,7 @@ const LogsPage: React.FC = () => {
   const [autoScroll, setAutoScroll] = useState(true);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
-  const { addNotification } = useNotification();
+  const { mode } = useTheme();
 
   useEffect(() => {
     fetchLogs();
@@ -66,7 +67,7 @@ const LogsPage: React.FC = () => {
         setLogs(data.data);
       }
     } catch (error) {
-      addNotification('获取日志失败', 'danger');
+      message.error('获取日志失败');
     } finally {
       setLoading(false);
     }
@@ -74,11 +75,17 @@ const LogsPage: React.FC = () => {
 
   const startStreaming = () => {
     const token = localStorage.getItem('auth_token');
-    const eventSource = new EventSource(`/ui/api/logs/stream?token=${token}`);
+    if (!token) {
+      message.error('未登录，无法获取日志');
+      return;
+    }
+
+    const url = `/ui/api/logs/stream?token=${encodeURIComponent(token)}`;
+    const eventSource = new EventSource(url);
     
     eventSource.onopen = () => {
       setIsStreaming(true);
-      addNotification('日志流已连接', 'success');
+      message.success('日志流已连接');
     };
 
     eventSource.addEventListener('log', (event) => {
@@ -93,9 +100,15 @@ const LogsPage: React.FC = () => {
       }
     });
 
-    eventSource.onerror = () => {
+    eventSource.addEventListener('connected', (event) => {
+      console.log('SSE connected:', event.data);
+    });
+
+    eventSource.onerror = (error) => {
+      console.error('SSE error:', error);
       setIsStreaming(false);
-      addNotification('日志流连接断开', 'danger');
+      message.error('日志流连接断开');
+      eventSource.close();
     };
 
     eventSourceRef.current = eventSource;
@@ -121,12 +134,12 @@ const LogsPage: React.FC = () => {
       const data = await response.json();
       if (data.code === 0) {
         setLogs([]);
-        addNotification('日志已清除', 'success');
+        message.success('日志已清除');
       } else {
-        addNotification(data.msg || '清除日志失败', 'danger');
+        message.error(data.msg || '清除日志失败');
       }
     } catch (error) {
-      addNotification('清除日志失败', 'danger');
+      message.error('清除日志失败');
     }
   };
 
@@ -142,7 +155,7 @@ const LogsPage: React.FC = () => {
     a.download = `logs_${new Date().toISOString().slice(0, 10)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    addNotification('日志已导出', 'success');
+    message.success('日志已导出');
   };
 
   const getLevelColor = (level: string) => {
@@ -177,6 +190,19 @@ const LogsPage: React.FC = () => {
     } catch {
       return timestamp;
     }
+  };
+
+  const logContainerStyle: React.CSSProperties = {
+    backgroundColor: mode === 'dark' ? '#0d1117' : '#f6f8fa',
+    color: mode === 'dark' ? '#c9d1d9' : '#24292f',
+    padding: 16,
+    borderRadius: 8,
+    height: 500,
+    overflowY: 'auto',
+    fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+    fontSize: 13,
+    lineHeight: 1.6,
+    border: mode === 'dark' ? '1px solid #30363d' : '1px solid #d0d7de'
   };
 
   return (
@@ -249,17 +275,7 @@ const LogsPage: React.FC = () => {
 
         <div 
           ref={logContainerRef}
-          style={{ 
-            backgroundColor: '#1e1e1e', 
-            color: '#d4d4d4',
-            padding: 16, 
-            borderRadius: 8,
-            height: 500,
-            overflowY: 'auto',
-            fontFamily: 'Consolas, Monaco, monospace',
-            fontSize: 13,
-            lineHeight: 1.6
-          }}
+          style={logContainerStyle}
         >
           {loading ? (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -274,7 +290,7 @@ const LogsPage: React.FC = () => {
           ) : (
             filteredLogs.map((log, index) => (
               <div key={index} style={{ marginBottom: 4 }}>
-                <Text style={{ color: '#6a9955', fontFamily: 'inherit' }}>
+                <Text style={{ color: mode === 'dark' ? '#7ee787' : '#1a7f37', fontFamily: 'inherit' }}>
                   [{formatTimestamp(log.timestamp)}]
                 </Text>
                 <Tag 
@@ -285,8 +301,9 @@ const LogsPage: React.FC = () => {
                 </Tag>
                 <Text 
                   style={{ 
-                    color: log.level === 'ERROR' ? '#f48771' : 
-                           log.level === 'WARN' ? '#dcdcaa' : '#d4d4d4',
+                    color: log.level === 'ERROR' ? (mode === 'dark' ? '#f85149' : '#cf222e') : 
+                           log.level === 'WARN' ? (mode === 'dark' ? '#d29922' : '#9a6700') : 
+                           (mode === 'dark' ? '#c9d1d9' : '#24292f'),
                     fontFamily: 'inherit'
                   }}
                 >

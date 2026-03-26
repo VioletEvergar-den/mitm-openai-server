@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, Typography, Dropdown, Avatar, Button, Space } from 'antd';
+import { Typography, Dropdown, Avatar, Space, Switch, Tooltip } from 'antd';
 import { 
   HomeOutlined, 
   SettingOutlined, 
@@ -8,20 +8,23 @@ import {
   LogoutOutlined,
   GithubOutlined,
   UserOutlined,
-  FileTextOutlined
+  FileTextOutlined,
+  SunOutlined,
+  MoonOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import './Navbar.css';
 
 const { Title } = Typography;
 
 const Navbar: React.FC = () => {
   const { isAuthenticated, logout } = useAuth();
+  const { mode, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [current, setCurrent] = useState('');
 
-  // 根据当前路径更新选中的菜单项
   useEffect(() => {
     const pathname = location.pathname;
     if (pathname === '/') {
@@ -33,16 +36,14 @@ const Navbar: React.FC = () => {
     } else if (pathname.startsWith('/settings')) {
       setCurrent('settings');
     } else if (pathname.startsWith('/requests/')) {
-      setCurrent('home'); // 查看请求详情时，仍然高亮"首页"
+      setCurrent('home');
     }
   }, [location]);
 
-  // 如果未认证，不显示导航栏
   if (!isAuthenticated) {
     return null;
   }
 
-  // 处理菜单点击
   const handleMenuClick = (e: {key: string}) => {
     setCurrent(e.key);
     if (e.key === 'logout') {
@@ -50,7 +51,6 @@ const Navbar: React.FC = () => {
     }
   };
 
-  // 菜单项定义
   const menuItems = [
     {
       key: 'home',
@@ -61,7 +61,7 @@ const Navbar: React.FC = () => {
     {
       key: 'guide',
       icon: <BookOutlined />,
-      label: 'OpenAI API配置教程',
+      label: '配置教程',
       onClick: () => navigate('/guide')
     },
     {
@@ -78,8 +78,30 @@ const Navbar: React.FC = () => {
     }
   ];
 
-  // 用户下拉菜单
   const userMenuItems = [
+    {
+      key: 'theme',
+      label: (
+        <Space>
+          <span>主题模式</span>
+          <Switch
+            checked={mode === 'dark'}
+            onChange={toggleTheme}
+            checkedChildren={<MoonOutlined />}
+            unCheckedChildren={<SunOutlined />}
+            size="small"
+          />
+        </Space>
+      ),
+      onClick: (e: any) => {
+        if (e.domEvent) {
+          e.domEvent.stopPropagation();
+        }
+      }
+    },
+    {
+      type: 'divider' as const,
+    },
     {
       key: 'logout',
       icon: <LogoutOutlined />,
@@ -88,7 +110,6 @@ const Navbar: React.FC = () => {
     }
   ];
 
-  // 渲染GitHub链接
   const renderGithubLink = () => (
     <a 
       href="https://github.com/llm-sec/mitm-openai-server" 
@@ -101,7 +122,6 @@ const Navbar: React.FC = () => {
     </a>
   );
 
-  // 渲染用户头像
   const renderUserAvatar = () => (
     <Dropdown 
       menu={{ items: userMenuItems }} 
@@ -123,10 +143,9 @@ const Navbar: React.FC = () => {
   return (
     <nav className="navbar">
       <div className="navbar-container">
-        {/* 左侧品牌和菜单 */}
         <div className="navbar-left">
           <Link to="/" className="navbar-brand">
-            <Title level={4}>中间人OpenAI API服务器</Title>
+            <Title level={4}>OpenAI API 代理</Title>
           </Link>
           <ul className="navbar-menu">
             {menuItems.map(item => (
@@ -143,8 +162,16 @@ const Navbar: React.FC = () => {
           </ul>
         </div>
         
-        {/* 右侧GitHub链接和用户头像 */}
         <div className="navbar-right">
+          <Tooltip title={mode === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}>
+            <Switch
+              checked={mode === 'dark'}
+              onChange={toggleTheme}
+              checkedChildren={<MoonOutlined />}
+              unCheckedChildren={<SunOutlined />}
+              className="theme-switch"
+            />
+          </Tooltip>
           <div className="github-container">
             {renderGithubLink()}
           </div>
@@ -157,4 +184,4 @@ const Navbar: React.FC = () => {
   );
 };
 
-export default Navbar; 
+export default Navbar;
