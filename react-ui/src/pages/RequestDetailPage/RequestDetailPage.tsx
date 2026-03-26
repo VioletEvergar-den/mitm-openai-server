@@ -8,7 +8,8 @@ import {
   RequestContent,
   ResponseContent,
   LoadingState,
-  ErrorState
+  ErrorState,
+  MessagesView
 } from './components';
 import { useNavigationKeys, useRequestDetail } from './hooks';
 import { 
@@ -104,6 +105,7 @@ const RequestDetailPage: React.FC = () => {
 
           <Tabs activeKey={activeTab} onChange={setActiveTab}>
             <TabPane tab="请求" key="1">
+              <MessagesView requestBody={request.requestBody} />
               <RequestContent
                 requestHeaders={request.requestHeaders}
                 queryParams={request.queryParams}
