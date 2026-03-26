@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, Typography, Tag, Empty, Divider, Space } from 'antd';
 import { UserOutlined, RobotOutlined, SettingOutlined } from '@ant-design/icons';
 
@@ -13,16 +13,30 @@ interface MessagesViewProps {
   requestBody: any;
 }
 
+const parseRequestBody = (body: any): { model: string; messages: Message[] } => {
+  let parsed = body;
+
+  if (typeof body === 'string') {
+    try {
+      parsed = JSON.parse(body);
+    } catch (e) {
+      console.error('Failed to parse request body string:', e);
+      return { model: '未知模型', messages: [] };
+    }
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return { model: '未知模型', messages: [] };
+  }
+
+  const model = parsed.model || '未知模型';
+  const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
+
+  return { model, messages };
+};
+
 const MessagesView: React.FC<MessagesViewProps> = ({ requestBody }) => {
-  if (!requestBody) {
-    return null;
-  }
-
-  let messages: Message[] = [];
-
-  if (Array.isArray(requestBody.messages)) {
-    messages = requestBody.messages;
-  }
+  const { model, messages } = useMemo(() => parseRequestBody(requestBody), [requestBody]);
 
   if (messages.length === 0) {
     return null;
@@ -110,8 +124,6 @@ const MessagesView: React.FC<MessagesViewProps> = ({ requestBody }) => {
 
     return <Text type="secondary">无法解析的内容格式</Text>;
   };
-
-  const model = requestBody.model || '未知模型';
 
   return (
     <Card
