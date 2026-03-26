@@ -310,8 +310,9 @@ func (s *proxyService) applyModelMapping(body []byte) []byte {
 	if model, ok := reqBody["model"].(string); ok {
 		fmt.Printf("[ModelMapping] 当前配置的映射表: %v\n", s.config.ModelMapping)
 		if s.config.ModelMapping != nil && len(s.config.ModelMapping) > 0 {
+			// 先尝试精确匹配
 			if actualModel, exists := s.config.ModelMapping[model]; exists && actualModel != "" {
-				fmt.Printf("[ModelMapping] 映射模型: %s -> %s\n", model, actualModel)
+				fmt.Printf("[ModelMapping] 映射模型(精确匹配): %s -> %s\n", model, actualModel)
 				reqBody["model"] = actualModel
 				newBody, err := json.Marshal(reqBody)
 				if err != nil {
@@ -319,6 +320,21 @@ func (s *proxyService) applyModelMapping(body []byte) []byte {
 				}
 				return newBody
 			}
+
+			// 尝试不区分大小写匹配
+			modelLower := strings.ToLower(model)
+			for key, actualModel := range s.config.ModelMapping {
+				if strings.ToLower(key) == modelLower && actualModel != "" {
+					fmt.Printf("[ModelMapping] 映射模型(忽略大小写): %s -> %s (配置key: %s)\n", model, actualModel, key)
+					reqBody["model"] = actualModel
+					newBody, err := json.Marshal(reqBody)
+					if err != nil {
+						return body
+					}
+					return newBody
+				}
+			}
+
 			fmt.Printf("[ModelMapping] 未找到模型 '%s' 的映射，可用映射: %v\n", model, s.config.ModelMapping)
 		} else {
 			fmt.Printf("[ModelMapping] 映射表为空或未配置，使用原始模型名: %s\n", model)
