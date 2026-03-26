@@ -589,10 +589,13 @@ func (s *SQLiteStorage) GetRequestByID(userID int64, id string) (*Request, error
 	req.ClientIP = ipAddress
 	req.IPAddress = ipAddress
 
-	// 解析时间戳
 	timestamp, err := time.Parse("2006-01-02 15:04:05", timestampStr)
 	if err != nil {
-		req.Timestamp = time.Now()
+		if t, e := time.Parse(time.RFC3339, timestampStr); e == nil {
+			req.Timestamp = t
+		} else {
+			req.Timestamp = time.Time{}
+		}
 	} else {
 		req.Timestamp = timestamp
 	}
@@ -661,15 +664,17 @@ func (s *SQLiteStorage) GetRequestByIDOnly(id string) (*Request, error) {
 	req.ClientIP = ipAddress
 	req.IPAddress = ipAddress
 
-	// 解析时间戳
 	timestamp, err := time.Parse("2006-01-02 15:04:05", timestampStr)
 	if err != nil {
-		req.Timestamp = time.Now()
+		if t, e := time.Parse(time.RFC3339, timestampStr); e == nil {
+			req.Timestamp = t
+		} else {
+			req.Timestamp = time.Time{}
+		}
 	} else {
 		req.Timestamp = timestamp
 	}
 
-	// 解析JSON字段
 	if err := json.Unmarshal([]byte(headersJSON), &req.Headers); err != nil {
 		return nil, fmt.Errorf("解析请求头JSON失败: %w", err)
 	}
@@ -741,19 +746,20 @@ func (s *SQLiteStorage) GetUserRequests(userID int64, limit, offset int) ([]*Req
 			continue
 		}
 
-		// 设置IP地址字段
 		req.ClientIP = ipAddress
 		req.IPAddress = ipAddress
 
-		// 解析时间戳
 		timestamp, err := time.Parse("2006-01-02 15:04:05", timestampStr)
 		if err != nil {
-			req.Timestamp = time.Now()
+			if t, e := time.Parse(time.RFC3339, timestampStr); e == nil {
+				req.Timestamp = t
+			} else {
+				req.Timestamp = time.Time{}
+			}
 		} else {
 			req.Timestamp = timestamp
 		}
 
-		// 解析JSON字段，出错时继续处理
 		validRequest := true
 
 		if err := json.Unmarshal([]byte(headersJSON), &req.Headers); err != nil {
@@ -938,18 +944,17 @@ func (s *SQLiteStorage) GetAllRequests(limit, offset int) ([]*Request, error) {
 			continue
 		}
 
-		// 设置IP地址字段
 		req.ClientIP = ipAddress
 		req.IPAddress = ipAddress
 
-		// 解析时间戳
 		if timestamp, err := time.Parse("2006-01-02 15:04:05", timestampStr); err == nil {
 			req.Timestamp = timestamp
+		} else if t, e := time.Parse(time.RFC3339, timestampStr); e == nil {
+			req.Timestamp = t
 		} else {
-			req.Timestamp = time.Now()
+			req.Timestamp = time.Time{}
 		}
 
-		// 解析JSON字段
 		json.Unmarshal([]byte(headersJSON), &req.Headers)
 		json.Unmarshal([]byte(queryJSON), &req.Query)
 

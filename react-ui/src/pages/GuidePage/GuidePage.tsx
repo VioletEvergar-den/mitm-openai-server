@@ -10,13 +10,32 @@ import {
   List,
   Avatar,
   Spin,
-  Alert
+  Alert,
+  Select
 } from 'antd';
 import { CopyOutlined, EyeOutlined, EyeInvisibleOutlined, UserOutlined } from '@ant-design/icons';
 import Layout from '../../components/Layout/Layout';
 import { useNotification } from '../../components/Notification';
 
 const { Title, Paragraph, Text } = Typography;
+
+const AVAILABLE_MODELS = [
+  { value: 'gpt-5.4', label: 'GPT-5.4' },
+  { value: 'gpt-5.4-pro', label: 'GPT-5.4 Pro' },
+  { value: 'gpt-5.2', label: 'GPT-5.2' },
+  { value: 'gpt-5.2-pro', label: 'GPT-5.2 Pro' },
+  { value: 'gpt-4', label: 'GPT-4' },
+  { value: 'gpt-4-32k', label: 'GPT-4 32K' },
+  { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+  { value: 'gpt-3.5-turbo-16k', label: 'GPT-3.5 Turbo 16K' },
+  { value: 'glm-5', label: 'GLM-5' },
+  { value: 'glm-5-turbo', label: 'GLM-5 Turbo' },
+  { value: 'kimi-k2.5', label: 'Kimi K2.5' },
+  { value: 'qwen3-max', label: 'Qwen3-Max' },
+  { value: 'qwen3.5-plus', label: 'Qwen3.5-Plus' },
+  { value: 'qwen3.5-flash', label: 'Qwen3.5-Flash' },
+  { value: 'qwen3.5-27b', label: 'Qwen3.5-27B' },
+];
 
 const GuidePage: React.FC = () => {
   const [showToken, setShowToken] = useState(false);
@@ -26,6 +45,7 @@ const GuidePage: React.FC = () => {
   const [messages, setMessages] = useState<Array<{role: string, content: string}>>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('gpt-5.4');
   const { addNotification } = useNotification();
 
   useEffect(() => {
@@ -66,7 +86,7 @@ const GuidePage: React.FC = () => {
     setIsLoading(true);
     
     try {
-      const requestData = { model: 'gpt-3.5-turbo', messages: updatedMessages, temperature: 0.7 };
+      const requestData = { model: selectedModel, messages: updatedMessages, temperature: 0.7 };
       const response = await fetch(`${backendUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': token },
@@ -130,6 +150,16 @@ const GuidePage: React.FC = () => {
         </Col>
         <Col span={24}>
           <Card title="4. 测试对话">
+            <Space style={{ marginBottom: 16 }}>
+              <Text>选择模型：</Text>
+              <Select
+                value={selectedModel}
+                onChange={setSelectedModel}
+                options={AVAILABLE_MODELS}
+                style={{ width: 200 }}
+                placeholder="选择模型"
+              />
+            </Space>
             <List
               dataSource={messages}
               renderItem={item => (
