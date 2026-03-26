@@ -387,32 +387,21 @@ func (s *UIServer) GetRequests(c *gin.Context) {
 	var requests []*storage.Request
 	var total int64
 
-	// 根据用户类型决定数据访问范围
-	if userType == "root" {
-		// root用户可以看到所有数据
-		requests, err = s.storage.GetAllRequests(limit, offset)
-		if err == nil {
-			// 获取总数
-			stats, statsErr := s.storage.GetStats()
-			if statsErr == nil && stats["total_requests"] != nil {
-				if totalInt, ok := stats["total_requests"].(int); ok {
-					total = int64(totalInt)
-				}
-			}
-		}
-	} else {
-		// 普通用户只能看到自己的数据
-		requests, err = s.storage.GetUserRequests(userID, limit, offset)
-		if err == nil {
-			// 获取用户总数
-			stats, statsErr := s.storage.GetUserStats(userID)
-			if statsErr == nil && stats["total_requests"] != nil {
-				if totalInt, ok := stats["total_requests"].(int); ok {
-					total = int64(totalInt)
-				}
+	// 所有用户都可以看到所有API代理请求（因为这是API代理的核心功能）
+	// root用户和普通用户都能看到所有请求
+	requests, err = s.storage.GetAllRequests(limit, offset)
+	if err == nil {
+		// 获取总数
+		stats, statsErr := s.storage.GetStats()
+		if statsErr == nil && stats["total_requests"] != nil {
+			if totalInt, ok := stats["total_requests"].(int); ok {
+				total = int64(totalInt)
 			}
 		}
 	}
+
+	// 记录日志
+	fmt.Printf("[GetRequests] 用户ID=%d, 用户类型=%s, 获取到%d条请求\n", userID, userType, len(requests))
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, StandardResponse{
@@ -440,9 +429,9 @@ func (s *UIServer) GetRequests(c *gin.Context) {
 	})
 }
 
-// GetRequestByID 获取特定ID的请求（用户隔离）
+// GetRequestByID 获取特定ID的请求
 func (s *UIServer) GetRequestByID(c *gin.Context) {
-	userID, _, userType, err := s.getCurrentUser(c)
+	_, _, _, err := s.getCurrentUser(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, StandardResponse{
 			Code: 10002,
@@ -461,16 +450,8 @@ func (s *UIServer) GetRequestByID(c *gin.Context) {
 		return
 	}
 
-	var req *storage.Request
-
-	// 根据用户类型决定数据访问范围
-	if userType == "root" {
-		// root用户可以访问任何请求，使用GetRequestByIDOnly
-		req, err = s.storage.GetRequestByIDOnly(id)
-	} else {
-		// 普通用户只能访问自己的请求
-		req, err = s.storage.GetRequestByID(userID, id)
-	}
+	// 所有用户都可以访问任何请求（API代理的核心功能）
+	req, err := s.storage.GetRequestByIDOnly(id)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, StandardResponse{

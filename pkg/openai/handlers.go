@@ -370,6 +370,7 @@ func (h *Handler) handleStreamRequest(c *gin.Context, method, path string, heade
 // SaveRequest 保存请求记录到存储（支持用户隔离）
 func (h *Handler) SaveRequest(userID int64, request *storage.Request) error {
 	if h.storage == nil {
+		fmt.Printf("[SaveRequest] 错误: 存储未初始化\n")
 		return fmt.Errorf("存储未初始化")
 	}
 
@@ -377,7 +378,13 @@ func (h *Handler) SaveRequest(userID int64, request *storage.Request) error {
 	request.UserID = userID
 
 	// 使用新的存储接口保存请求
-	return h.storage.SaveRequest(userID, request)
+	err := h.storage.SaveRequest(userID, request)
+	if err != nil {
+		fmt.Printf("[SaveRequest] 保存请求失败: %v, 请求ID: %s, 用户ID: %d\n", err, request.ID, userID)
+	} else {
+		fmt.Printf("[SaveRequest] 请求已保存: ID=%s, 用户ID=%d, 方法=%s, 路径=%s\n", request.ID, userID, request.Method, request.Path)
+	}
+	return err
 }
 
 // getUserFromContext 从gin.Context中获取用户信息
