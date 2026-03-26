@@ -416,8 +416,6 @@ export const apiService = {
 
   getRequestNavigationIds: async (id: string): Promise<{prevId: string | null, nextId: string | null}> => {
     try {
-      // 尝试调用单独的导航接口
-      // 由于后端没有实现 /requests/${id}/navigation 接口，我们使用单独的上一个和下一个请求API
       const [prevId, nextId] = await Promise.all([
         apiService.getPreviousRequestId(id),
         apiService.getNextRequestId(id)
@@ -427,6 +425,35 @@ export const apiService = {
     } catch (error) {
       console.error(`获取请求导航失败 ID=${id}:`, error);
       return {prevId: null, nextId: null};
+    }
+  },
+
+  checkUpdate: async (): Promise<{hasUpdate: boolean, currentVersion: string, latestVersion: string} | null> => {
+    try {
+      const response = await API.get('/update/check');
+      if (response.data && response.data.data) {
+        return response.data.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('检查更新失败:', error);
+      return null;
+    }
+  },
+
+  performUpdate: async (useGit = false): Promise<{success: boolean, message: string}> => {
+    try {
+      const response = await API.post('/update', { useGit });
+      return {
+        success: response.data.code === 0,
+        message: response.data.msg
+      };
+    } catch (error) {
+      console.error('执行更新失败:', error);
+      return {
+        success: false,
+        message: '更新失败，请查看服务器日志'
+      };
     }
   }
 }; 

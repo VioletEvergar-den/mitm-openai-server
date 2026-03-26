@@ -13,9 +13,11 @@ import {
   Col,
   Divider,
   Table,
-  Popconfirm
+  Popconfirm,
+  Modal,
+  Tag
 } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, SyncOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import Layout from '../../components/Layout/Layout';
 import { ProxyConfig } from '../../types';
 import { apiService } from '../../services/api';
@@ -38,6 +40,9 @@ const SettingsPage: React.FC = () => {
   const [modelMappings, setModelMappings] = useState<ModelMappingItem[]>([]);
   const [newCustomModel, setNewCustomModel] = useState('');
   const [newActualModel, setNewActualModel] = useState('');
+  const [updateInfo, setUpdateInfo] = useState<{hasUpdate: boolean, currentVersion: string, latestVersion: string} | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const { addNotification } = useNotification();
   
   const isProxyEnabled = Form.useWatch('enabled', form);
@@ -149,6 +154,57 @@ const SettingsPage: React.FC = () => {
       ),
     },
   ];
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    try {
+      const info = await apiService.checkUpdate();
+      if (info) {
+        setUpdateInfo(info);
+        if (info.hasUpdate) {
+          addNotification(`发现新版本 ${info.latestVersion}`, 'success');
+        } else {
+          addNotification('当前已是最新版本', 'success');
+        }
+      } else {
+        addNotification('检查更新失败', 'danger');
+      }
+    } catch (error) {
+      addNotification('检查更新失败', 'danger');
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  const handlePerformUpdate = async (useGit = false) => {
+    Modal.confirm({
+      title: '确认更新',
+      content: useGit 
+        ? '将通过 Git 拉取最新代码并重新编译，确定继续吗？' 
+        : '将下载最新版本并替换当前程序，更新后需要重启服务器。确定继续吗？',
+      okText: '确定',
+      cancelText: '取消',
+      onOk: async () => {
+        setUpdating(true);
+        try {
+          const result = await apiService.performUpdate(useGit);
+          if (result.success) {
+            addNotification(result.message, 'success');
+            Modal.success({
+              title: '更新成功',
+              content: '请重启服务器以使用新版本。',
+            });
+          } else {
+            addNotification(result.message, 'danger');
+          }
+        } catch (error) {
+          addNotification('更新失败', 'danger');
+        } finally {
+          setUpdating(false);
+        }
+      }
+    });
+  };
 
   return (
     <Layout title="系统设置">
@@ -274,6 +330,61 @@ const SettingsPage: React.FC = () => {
               </Button>
             </Form.Item>
           </Form>
+        </Card>
+
+        <Card style={{ marginTop: 16 }}>
+          <Title level={4}>系统更新</Title>
+          <Paragraph type="secondary">
+            检查并更新到最新版本。更新后需要重启服务器。
+          </Paragraph>
+          
+          <Space direction="vertical" style={{ width: '100%' }}>
+            {updateInfo && (
+              <div style={{ marginBottom: 16 }}>
+                <Space>
+                  <Text strong>当前版本:</Text>
+                  <Tag color="blue">{updateInfo.currentVersion}</Tag>
+                  <Text strong>最新版本:</Text>
+                  <Tag color={updateInfo.hasUpdate ? 'green' : 'blue'}>
+                    {updateInfo.latestVersion}
+                  </Tag>
+                  {updateInfo.hasUpdate ? (
+                    <Tag color="orange" icon={<ExclamationCircleOutlined />}>有新版本</Tag>
+                  ) : (
+                    <Tag color="green" icon={<CheckCircleOutlined />}>已是最新</Tag>
+                  )}
+                </Space>
+              </div>
+            )}
+            
+            <Space>
+              <Button
+                icon={<SyncOutlined spin={checkingUpdate} />}
+                onClick={handleCheckUpdate}
+                loading={checkingUpdate}
+              >
+                检查更新
+              </Button>
+              
+              {updateInfo?.hasUpdate && (
+                <>
+                  <Button
+                    type="primary"
+                    onClick={() => handlePerformUpdate(false)}
+                    loading={updating}
+                  >
+                    下载更新
+                  </Button>
+                  <Button
+                    onClick={() => handlePerformUpdate(true)}
+                    loading={updating}
+                  >
+                    Git 更新
+                  </Button>
+                </>
+              )}
+            </Space>
+          </Space>
         </Card>
       </Spin>
     </Layout>

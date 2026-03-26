@@ -11,7 +11,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/llm-sec/mitm-openai-server/pkg/openai"
 	"github.com/llm-sec/mitm-openai-server/pkg/storage"
+	"github.com/llm-sec/mitm-openai-server/pkg/updater"
 	"github.com/llm-sec/mitm-openai-server/pkg/utils"
+	"github.com/llm-sec/mitm-openai-server/pkg/version"
 )
 
 // UIServer 表示UI API服务器
@@ -125,6 +127,10 @@ func (s *UIServer) SetupUIRoutes(router *gin.Engine, authMiddleware gin.HandlerF
 
 	// 添加聊天测试接口
 	uiAPI.POST("/chat", s.HandleUIChat)
+
+	// 系统更新接口（仅管理员）
+	uiAPI.GET("/update/check", s.CheckUpdate)
+	uiAPI.POST("/update", s.PerformUpdate)
 
 	// 管理员专用接口
 	adminAPI := uiAPI.Group("/admin")
@@ -1227,4 +1233,88 @@ func (s *UIServer) SetConfig(config ServerConfig) {
 	if config.UIPassword != "" {
 		s.config.UIPassword = config.UIPassword
 	}
+}
+
+// CheckUpdate 检查是否有更新
+func (s *UIServer) CheckUpdate(c *gin.Context) {
+	_, _, userType, err := s.getCurrentUser(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, StandardResponse{
+			Code: 10002,
+			Msg:  "认证失败",
+		})
+		return
+	}
+
+	if userType != "root" {
+		c.JSON(http.StatusForbidden, StandardResponse{
+			Code: 10003,
+			Msg:  "权限不足，只有管理员可以检查更新",
+		})
+		return
+	}
+
+	hasUpdate, latestVersion, err := updater.CheckForUpdate(version.Version)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, StandardResponse{
+			Code: 10023,
+			Msg:  "检查更新失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, StandardResponse{
+		Code: 0,
+		Msg:  "检查更新成功",
+		Data: map[string]interface{}{
+			"currentVersion": version.Version,
+			"latestVersion":  latestVersion,
+			"hasUpdate":      hasUpdate,
+		},
+	})
+}
+
+// PerformUpdate 执行更新
+func (s *UIServer) PerformUpdate(c *gin.Context) {
+	_, _, userType, err := s.getCurrentUser(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, StandardResponse{
+			Code: 10002,
+			Msg:  "认证失败",
+		})
+		return
+	}
+
+	if userType != "root" {
+		c.JSON(http.StatusForbidden, StandardResponse{
+			Code: 10003,
+			Msg:  "权限不足，只有管理员可以执行更新",
+		})
+		return
+	}
+
+	var req struct {
+		UseGit bool `json:"useGit"`
+	}
+	c.ShouldBindJSON(&req)
+
+	var updateErr error
+	if req.UseGit {
+		updateErr = updater.UpdateViaGit()
+	} else {
+		updateErr = updater.PerformUpdate(version.Version)
+	}
+
+	if updateErr != nil {
+		c.JSON(http.StatusInternalServerError, StandardResponse{
+			Code: 10024,
+			Msg:  "更新失败: " + updateErr.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, StandardResponse{
+		Code: 0,
+		Msg:  "更新成功，请重启服务器",
+	})
 }
