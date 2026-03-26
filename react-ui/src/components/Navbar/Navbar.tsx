@@ -7,7 +7,8 @@ import {
   BookOutlined,
   LogoutOutlined,
   GithubOutlined,
-  UserOutlined
+  UserOutlined,
+  FileTextOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
 import './Navbar.css';
@@ -27,6 +28,8 @@ const Navbar: React.FC = () => {
       setCurrent('home');
     } else if (pathname.startsWith('/guide')) {
       setCurrent('guide');
+    } else if (pathname.startsWith('/logs')) {
+      setCurrent('logs');
     } else if (pathname.startsWith('/settings')) {
       setCurrent('settings');
     } else if (pathname.startsWith('/requests/')) {
@@ -60,6 +63,12 @@ const Navbar: React.FC = () => {
       icon: <BookOutlined />,
       label: 'OpenAI API配置教程',
       onClick: () => navigate('/guide')
+    },
+    {
+      key: 'logs',
+      icon: <FileTextOutlined />,
+      label: '实时日志',
+      onClick: () => navigate('/logs')
     },
     {
       key: 'settings',

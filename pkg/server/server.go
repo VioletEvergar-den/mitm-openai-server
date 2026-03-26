@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/llm-sec/mitm-openai-server/pkg/api"
+	"github.com/llm-sec/mitm-openai-server/pkg/logger"
 	"github.com/llm-sec/mitm-openai-server/pkg/openai"
 )
 
@@ -31,6 +32,8 @@ func NewServerWithConfig(config api.ServerConfig) *Server {
 	if config.EnableCORS {
 		router.Use(corsMiddleware(config.AllowOrigins))
 	}
+
+	logger.InitLogBuffer(1000)
 
 	s := &Server{
 		config: config,

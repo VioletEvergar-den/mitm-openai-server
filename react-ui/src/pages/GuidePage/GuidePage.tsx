@@ -131,15 +131,12 @@ const GuidePage: React.FC = () => {
         </Col>
         <Col span={24}>
           <Card title="2. 认证Token">
-            <Input 
+            <Input.Password 
               value={token} 
               readOnly 
-              type={showToken ? 'text' : 'password'}
+              visibilityToggle={{ onVisible: () => setShowToken(true), onInvisible: () => setShowToken(false) }}
               addonAfter={
-                <Space>
-                  <Button icon={showToken ? <EyeInvisibleOutlined /> : <EyeOutlined />} onClick={() => setShowToken(!showToken)} />
-                  <Button icon={<CopyOutlined />} onClick={() => copyToClipboard(token)} />
-                </Space>
+                <Button icon={<CopyOutlined />} onClick={() => copyToClipboard(token)} />
               }
             />
             <Text type="secondary" style={{ marginTop: 8, display: 'block' }}>在您的OpenAI客户端中，使用此Token作为API密钥。</Text>

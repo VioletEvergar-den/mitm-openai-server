@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/llm-sec/mitm-openai-server/pkg/logger"
 	"github.com/llm-sec/mitm-openai-server/pkg/openai"
 	"github.com/llm-sec/mitm-openai-server/pkg/storage"
 	"github.com/llm-sec/mitm-openai-server/pkg/updater"
@@ -139,6 +140,11 @@ func (s *UIServer) SetupUIRoutes(router *gin.Engine, authMiddleware gin.HandlerF
 	adminAPI.GET("/all-requests", s.GetAllRequests)
 	adminAPI.DELETE("/all-requests", s.DeleteAllRequests)
 	adminAPI.GET("/global-stats", s.GetGlobalStats)
+
+	// 日志接口
+	uiAPI.GET("/logs", s.GetLogs)
+	uiAPI.GET("/logs/stream", s.StreamLogs)
+	uiAPI.DELETE("/logs", s.ClearLogs)
 }
 
 // getCurrentUser 从gin.Context中获取当前用户信息
@@ -797,7 +803,7 @@ func (s *UIServer) SaveProxyConfig(c *gin.Context) {
 		if configReq.ModelMapping != nil {
 			s.config.ModelMapping = configReq.ModelMapping
 		}
-		
+
 		newConfig := openai.Config{
 			ProxyMode:      s.config.ProxyMode,
 			TargetURL:      s.config.TargetURL,
@@ -807,11 +813,11 @@ func (s *UIServer) SaveProxyConfig(c *gin.Context) {
 			TargetToken:    s.config.TargetToken,
 			ModelMapping:   s.config.ModelMapping,
 		}
-		
+
 		s.openaiService.UpdateConfig(newConfig)
-		
+
 		openai.UpdateGlobalHandlerConfig(newConfig)
-		
+
 		fmt.Printf("代理模式配置已更新: ProxyMode=%v, TargetURL=%s\n", s.config.ProxyMode, s.config.TargetURL)
 	} else {
 		// 普通用户更新数据库配置
@@ -1322,5 +1328,113 @@ func (s *UIServer) PerformUpdate(c *gin.Context) {
 	c.JSON(http.StatusOK, StandardResponse{
 		Code: 0,
 		Msg:  "更新成功，请重启服务器",
+	})
+}
+
+// ==================== 日志相关接口 ====================
+
+// GetLogs 获取日志列表
+func (s *UIServer) GetLogs(c *gin.Context) {
+	count := 100
+	if countStr := c.Query("count"); countStr != "" {
+		fmt.Sscanf(countStr, "%d", &count)
+	}
+
+	logBuffer := logger.GetLogBuffer()
+	if logBuffer == nil {
+		c.JSON(http.StatusOK, StandardResponse{
+			Code: 0,
+			Msg:  "获取日志成功",
+			Data: []logger.LogEntry{},
+		})
+		return
+	}
+
+	logs := logBuffer.GetLogs(count)
+
+	c.JSON(http.StatusOK, StandardResponse{
+		Code: 0,
+		Msg:  "获取日志成功",
+		Data: logs,
+	})
+}
+
+// StreamLogs 实时日志流 (SSE)
+func (s *UIServer) StreamLogs(c *gin.Context) {
+	logBuffer := logger.GetLogBuffer()
+	if logBuffer == nil {
+		c.JSON(http.StatusInternalServerError, StandardResponse{
+			Code: 10025,
+			Msg:  "日志系统未初始化",
+		})
+		return
+	}
+
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("Access-Control-Allow-Origin", "*")
+
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, StandardResponse{
+			Code: 10026,
+			Msg:  "不支持流式响应",
+		})
+		return
+	}
+
+	ch := logBuffer.Subscribe()
+	defer logBuffer.Unsubscribe(ch)
+
+	c.SSEvent("connected", "日志流已连接")
+	flusher.Flush()
+
+	ctx := c.Request.Context()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case entry, ok := <-ch:
+			if !ok {
+				return
+			}
+			c.SSEvent("log", entry)
+			flusher.Flush()
+		case <-time.After(30 * time.Second):
+			c.SSEvent("ping", "keep-alive")
+			flusher.Flush()
+		}
+	}
+}
+
+// ClearLogs 清除日志
+func (s *UIServer) ClearLogs(c *gin.Context) {
+	_, _, userType, err := s.getCurrentUser(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, StandardResponse{
+			Code: 10002,
+			Msg:  "认证失败",
+		})
+		return
+	}
+
+	if userType != "root" {
+		c.JSON(http.StatusForbidden, StandardResponse{
+			Code: 10003,
+			Msg:  "权限不足，只有管理员可以清除日志",
+		})
+		return
+	}
+
+	logBuffer := logger.GetLogBuffer()
+	if logBuffer != nil {
+		logBuffer.Clear()
+	}
+
+	c.JSON(http.StatusOK, StandardResponse{
+		Code: 0,
+		Msg:  "日志已清除",
 	})
 }

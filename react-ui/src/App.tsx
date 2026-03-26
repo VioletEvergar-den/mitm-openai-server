@@ -7,6 +7,7 @@ import RequestsPage from './pages/RequestsPage';
 import RequestDetailPage from './pages/RequestDetailPage';
 import SettingsPage from './pages/SettingsPage';
 import GuidePage from './pages/GuidePage';
+import LogsPage from './pages/LogsPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './components/Notification';
 import './styles/Global.css';
@@ -92,6 +93,12 @@ const App: React.FC = () => {
             <Route path="/guide" element={
               <ProtectedRoute>
                 <GuidePage />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/logs" element={
+              <ProtectedRoute>
+                <LogsPage />
               </ProtectedRoute>
             } />
           </Routes>

@@ -316,6 +316,7 @@ const SettingsPage: React.FC = () => {
               <Table
                 dataSource={modelMappings}
                 columns={mappingColumns}
+                rowKey="key"
                 pagination={false}
                 size="small"
                 bordered
