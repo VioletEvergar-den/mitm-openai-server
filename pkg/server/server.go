@@ -165,6 +165,10 @@ func (s *Server) setupStaticRoutes(router *gin.Engine) {
 		router.Static("/ui/assets", filepath.Join(absUIDir, "assets"))
 		router.StaticFile("/ui/favicon.ico", filepath.Join(absUIDir, "favicon.ico"))
 
+		router.GET("/ui", func(c *gin.Context) {
+			c.File(filepath.Join(absUIDir, "index.html"))
+		})
+
 		router.GET("/ui/login", func(c *gin.Context) {
 			c.File(filepath.Join(absUIDir, "index.html"))
 		})

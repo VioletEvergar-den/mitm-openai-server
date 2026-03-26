@@ -296,6 +296,7 @@ func (h *Handler) handleStreamRequest(c *gin.Context, method, path string, heade
 
 	// 获取用户信息
 	userID, username := h.getUserFromContext(c)
+	fmt.Printf("[handleStreamRequest] 用户ID=%d, 用户名=%s\n", userID, username)
 
 	// 设置SSE响应头
 	c.Header("Content-Type", "text/event-stream")
@@ -316,55 +317,58 @@ func (h *Handler) handleStreamRequest(c *gin.Context, method, path string, heade
 
 	// 收集完整响应用于保存
 	var fullResponse []byte
+	streamDone := false
 
-	for {
+	for !streamDone {
 		select {
 		case data, ok := <-dataChan:
 			if !ok {
 				// 数据通道关闭，流结束
-				// 保存请求记录
-				response := &storage.ProxyResponse{
-					StatusCode: 200,
-					Headers:    map[string]string{"Content-Type": "text/event-stream"},
-					Body:       string(fullResponse),
-					Latency:    time.Since(startTime).Milliseconds(),
-				}
-
-				request := &storage.Request{
-					ID:        uuid.New().String(),
-					UserID:    userID,
-					Method:    method,
-					Path:      path,
-					Timestamp: time.Now(),
-					Headers:   headers,
-					Query:     queryParams,
-					Body:      bodyBytes,
-					ClientIP:  utils.GetClientIP(c.Request),
-					Response:  response,
-					Metadata: map[string]interface{}{
-						"source":     "openai_handler_stream",
-						"user_id":    userID,
-						"username":   username,
-						"latency_ms": time.Since(startTime).Milliseconds(),
-					},
-				}
-
-				h.SaveRequest(userID, request)
-				return
+				streamDone = true
+			} else {
+				// 写入数据到客户端
+				c.Writer.Write(data)
+				c.Writer.Flush()
+				fullResponse = append(fullResponse, data...)
 			}
-			// 写入数据到客户端
-			c.Writer.Write(data)
-			c.Writer.Flush()
-			fullResponse = append(fullResponse, data...)
-
-		case err := <-errChan:
-			if err != nil {
+		case err, ok := <-errChan:
+			if ok && err != nil {
 				fmt.Printf("[HandleStreamRequest] 错误: %v\n", err)
 				c.SSEvent("error", map[string]string{"error": err.Error()})
 			}
-			return
+			// 无论是否有错误，都继续等待dataChan关闭
 		}
 	}
+
+	// 流结束后保存请求记录
+	fmt.Printf("[handleStreamRequest] 流结束，准备保存请求记录\n")
+	response := &storage.ProxyResponse{
+		StatusCode: 200,
+		Headers:    map[string]string{"Content-Type": "text/event-stream"},
+		Body:       string(fullResponse),
+		Latency:    time.Since(startTime).Milliseconds(),
+	}
+
+	request := &storage.Request{
+		ID:        uuid.New().String(),
+		UserID:    userID,
+		Method:    method,
+		Path:      path,
+		Timestamp: time.Now(),
+		Headers:   headers,
+		Query:     queryParams,
+		Body:      bodyBytes,
+		ClientIP:  utils.GetClientIP(c.Request),
+		Response:  response,
+		Metadata: map[string]interface{}{
+			"source":     "openai_handler_stream",
+			"user_id":    userID,
+			"username":   username,
+			"latency_ms": time.Since(startTime).Milliseconds(),
+		},
+	}
+
+	h.SaveRequest(userID, request)
 }
 
 // SaveRequest 保存请求记录到存储（支持用户隔离）
@@ -374,15 +378,22 @@ func (h *Handler) SaveRequest(userID int64, request *storage.Request) error {
 		return fmt.Errorf("存储未初始化")
 	}
 
+	// 对于root用户（ID=0），使用默认API用户的ID来保存请求
+	// 因为root用户不存在于数据库中，外键约束会失败
+	saveUserID := userID
+	if userID == 0 {
+		saveUserID = h.defaultUserID
+	}
+
 	// 确保请求记录包含用户ID
-	request.UserID = userID
+	request.UserID = saveUserID
 
 	// 使用新的存储接口保存请求
-	err := h.storage.SaveRequest(userID, request)
+	err := h.storage.SaveRequest(saveUserID, request)
 	if err != nil {
-		fmt.Printf("[SaveRequest] 保存请求失败: %v, 请求ID: %s, 用户ID: %d\n", err, request.ID, userID)
+		fmt.Printf("[SaveRequest] 保存请求失败: %v, 请求ID: %s, 用户ID: %d\n", err, request.ID, saveUserID)
 	} else {
-		fmt.Printf("[SaveRequest] 请求已保存: ID=%s, 用户ID=%d, 方法=%s, 路径=%s\n", request.ID, userID, request.Method, request.Path)
+		fmt.Printf("[SaveRequest] 请求已保存: ID=%s, 用户ID=%d, 方法=%s, 路径=%s\n", request.ID, saveUserID, request.Method, request.Path)
 	}
 	return err
 }
@@ -392,7 +403,7 @@ func (h *Handler) SaveRequest(userID int64, request *storage.Request) error {
 func (h *Handler) getUserFromContext(c *gin.Context) (int64, string) {
 	// 尝试从上下文中获取用户信息
 	if userID, exists := c.Get("user_id"); exists {
-		if uid, ok := userID.(int64); ok && uid > 0 {
+		if uid, ok := userID.(int64); ok && uid >= 0 {
 			if username, exists := c.Get("username"); exists {
 				return uid, username.(string)
 			}
