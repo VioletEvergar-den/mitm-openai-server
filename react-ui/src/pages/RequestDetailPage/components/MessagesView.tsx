@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { Card, Typography, Tag, Empty, Divider, Space, Alert } from 'antd';
-import { UserOutlined, RobotOutlined, SettingOutlined } from '@ant-design/icons';
+import { Card, Typography, Tag, Empty, Divider, Space, Alert, Button, Dropdown, message } from 'antd';
+import { UserOutlined, RobotOutlined, SettingOutlined, DownloadOutlined, FileTextOutlined, FileMarkdownOutlined, CodeOutlined } from '@ant-design/icons';
+import type { MenuProps } from 'antd';
 
 const { Text, Paragraph } = Typography;
 
@@ -66,8 +67,171 @@ const parseRequestBody = (body: any): { model: string; messages: Message[]; rawB
   return { model, messages, rawBody: parsed };
 };
 
+const getRoleName = (role: string): string => {
+  const names: Record<string, string> = {
+    user: '用户',
+    assistant: '助手',
+    system: '系统',
+    tool: '工具',
+    function: '函数'
+  };
+  return names[role] || role;
+};
+
+const getContentText = (content: string | Array<any>): string => {
+  if (typeof content === 'string') {
+    return tryBase64Decode(content);
+  }
+
+  if (Array.isArray(content)) {
+    return content.map((part) => {
+      if (part.type === 'text') {
+        return tryBase64Decode(part.text || '');
+      }
+      if (part.type === 'image_url') {
+        return `[图片: ${part.image_url?.url?.substring(0, 50) || '未知'}...]`;
+      }
+      return `[${part.type || '未知类型'}]`;
+    }).join('\n');
+  }
+
+  return '无法解析的内容格式';
+};
+
+const exportAsMarkdown = (model: string, messages: Message[]) => {
+  const lines: string[] = [];
+  
+  lines.push(`# 对话记录`);
+  lines.push(``);
+  lines.push(`**模型**: ${model}`);
+  lines.push(`**消息数量**: ${messages.length}`);
+  lines.push(`**导出时间**: ${new Date().toLocaleString('zh-CN')}`);
+  lines.push(``);
+  lines.push(`---`);
+  lines.push(``);
+
+  messages.forEach((msg, index) => {
+    const roleName = getRoleName(msg.role);
+    const content = getContentText(msg.content);
+    
+    lines.push(`## ${index + 1}. ${roleName}`);
+    lines.push(``);
+    lines.push(content);
+    lines.push(``);
+    lines.push(`---`);
+    lines.push(``);
+  });
+
+  return lines.join('\n');
+};
+
+const exportAsText = (model: string, messages: Message[]) => {
+  const lines: string[] = [];
+  
+  lines.push(`对话记录`);
+  lines.push(`模型: ${model}`);
+  lines.push(`消息数量: ${messages.length}`);
+  lines.push(`导出时间: ${new Date().toLocaleString('zh-CN')}`);
+  lines.push(``);
+  lines.push(`${'='.repeat(50)}`);
+  lines.push(``);
+
+  messages.forEach((msg, index) => {
+    const roleName = getRoleName(msg.role);
+    const content = getContentText(msg.content);
+    
+    lines.push(`【${roleName}】`);
+    lines.push(content);
+    lines.push(``);
+    lines.push(`${'-'.repeat(50)}`);
+    lines.push(``);
+  });
+
+  return lines.join('\n');
+};
+
+const exportAsJSON = (model: string, messages: Message[], rawBody: any) => {
+  const exportData = {
+    model,
+    messages: messages.map(msg => ({
+      role: msg.role,
+      content: getContentText(msg.content)
+    })),
+    exportedAt: new Date().toISOString(),
+    rawBody
+  };
+  
+  return JSON.stringify(exportData, null, 2);
+};
+
+const downloadFile = (content: string, filename: string, mimeType: string) => {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 const MessagesView: React.FC<MessagesViewProps> = ({ requestBody }) => {
   const { model, messages, rawBody } = useMemo(() => parseRequestBody(requestBody), [requestBody]);
+
+  const handleExport = (format: 'markdown' | 'text' | 'json') => {
+    if (messages.length === 0) {
+      message.warning('没有可导出的对话消息');
+      return;
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+    let content: string;
+    let filename: string;
+    let mimeType: string;
+
+    switch (format) {
+      case 'markdown':
+        content = exportAsMarkdown(model, messages);
+        filename = `对话记录_${timestamp}.md`;
+        mimeType = 'text/markdown;charset=utf-8';
+        break;
+      case 'text':
+        content = exportAsText(model, messages);
+        filename = `对话记录_${timestamp}.txt`;
+        mimeType = 'text/plain;charset=utf-8';
+        break;
+      case 'json':
+        content = exportAsJSON(model, messages, rawBody);
+        filename = `对话记录_${timestamp}.json`;
+        mimeType = 'application/json;charset=utf-8';
+        break;
+    }
+
+    downloadFile(content, filename, mimeType);
+    message.success(`已导出为 ${format.toUpperCase()} 格式`);
+  };
+
+  const exportMenuItems: MenuProps['items'] = [
+    {
+      key: 'markdown',
+      icon: <FileMarkdownOutlined />,
+      label: 'Markdown 格式',
+      onClick: () => handleExport('markdown')
+    },
+    {
+      key: 'text',
+      icon: <FileTextOutlined />,
+      label: '纯文本格式',
+      onClick: () => handleExport('text')
+    },
+    {
+      key: 'json',
+      icon: <CodeOutlined />,
+      label: 'JSON 格式',
+      onClick: () => handleExport('json')
+    }
+  ];
 
   if (!requestBody) {
     return null;
@@ -204,6 +368,13 @@ const MessagesView: React.FC<MessagesViewProps> = ({ requestBody }) => {
           <Tag color="blue">{model}</Tag>
           <Text type="secondary">({messages.length} 条消息)</Text>
         </Space>
+      }
+      extra={
+        <Dropdown menu={{ items: exportMenuItems }} placement="bottomRight">
+          <Button type="primary" icon={<DownloadOutlined />} size="small">
+            导出对话
+          </Button>
+        </Dropdown>
       }
       style={{ marginBottom: 16 }}
     >
