@@ -16,7 +16,8 @@ import {
   Popconfirm,
   Modal,
   Tag,
-  Alert
+  Alert,
+  Tooltip
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -27,7 +28,9 @@ import {
   SettingOutlined,
   CloudServerOutlined,
   ApiOutlined,
-  SafetyOutlined
+  SafetyOutlined,
+  InfoCircleOutlined,
+  ThunderboltOutlined
 } from '@ant-design/icons';
 import Layout from '../../components/Layout/Layout';
 import { ProxyConfig } from '../../types';
@@ -41,7 +44,120 @@ interface ModelMappingItem {
   key: string;
   customModel: string;
   actualModel: string;
+  provider?: string;
 }
+
+interface AIProvider {
+  name: string;
+  baseUrl: string;
+  description: string;
+  models: { customModel: string; actualModel: string; description: string }[];
+}
+
+const AI_PROVIDERS: AIProvider[] = [
+  {
+    name: 'OpenAI',
+    baseUrl: 'https://api.openai.com/v1',
+    description: 'OpenAI 官方 API',
+    models: [
+      { customModel: 'gpt-4o', actualModel: 'gpt-4o', description: 'GPT-4 Optimized' },
+      { customModel: 'gpt-4-turbo', actualModel: 'gpt-4-turbo', description: 'GPT-4 Turbo' },
+      { customModel: 'gpt-4', actualModel: 'gpt-4', description: 'GPT-4' },
+      { customModel: 'gpt-3.5-turbo', actualModel: 'gpt-3.5-turbo', description: 'GPT-3.5 Turbo' },
+    ]
+  },
+  {
+    name: '飞牛云',
+    baseUrl: 'https://api.qnaigc.com/v1',
+    description: '飞牛云 AI 服务',
+    models: [
+      { customModel: 'gpt-4o', actualModel: 'gpt-4o', description: 'GPT-4o' },
+      { customModel: 'gpt-4-turbo', actualModel: 'gpt-4-turbo', description: 'GPT-4 Turbo' },
+      { customModel: 'claude-3-opus', actualModel: 'claude-3-opus-20240229', description: 'Claude 3 Opus' },
+      { customModel: 'claude-3-sonnet', actualModel: 'claude-3-sonnet-20240229', description: 'Claude 3 Sonnet' },
+    ]
+  },
+  {
+    name: '硅基流动',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    description: '硅基流动 AI 服务',
+    models: [
+      { customModel: 'qwen-turbo', actualModel: 'Qwen/Qwen2.5-7B-Instruct', description: 'Qwen 2.5 7B' },
+      { customModel: 'qwen-plus', actualModel: 'Qwen/Qwen2.5-72B-Instruct', description: 'Qwen 2.5 72B' },
+      { customModel: 'deepseek-v3', actualModel: 'deepseek-ai/DeepSeek-V3', description: 'DeepSeek V3' },
+      { customModel: 'yi-large', actualModel: '01-ai/Yi-1.5-34B-Chat', description: 'Yi 1.5 34B' },
+    ]
+  },
+  {
+    name: 'DeepSeek',
+    baseUrl: 'https://api.deepseek.com',
+    description: 'DeepSeek 官方 API',
+    models: [
+      { customModel: 'deepseek-chat', actualModel: 'deepseek-chat', description: 'DeepSeek Chat' },
+      { customModel: 'deepseek-coder', actualModel: 'deepseek-coder', description: 'DeepSeek Coder' },
+    ]
+  },
+  {
+    name: '智谱AI',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    description: '智谱 AI GLM 系列',
+    models: [
+      { customModel: 'glm-4', actualModel: 'glm-4', description: 'GLM-4' },
+      { customModel: 'glm-4-flash', actualModel: 'glm-4-flash', description: 'GLM-4 Flash' },
+      { customModel: 'glm-3-turbo', actualModel: 'glm-3-turbo', description: 'GLM-3 Turbo' },
+    ]
+  },
+  {
+    name: '月之暗面',
+    baseUrl: 'https://api.moonshot.cn/v1',
+    description: 'Moonshot Kimi 系列',
+    models: [
+      { customModel: 'moonshot-v1-8k', actualModel: 'moonshot-v1-8k', description: 'Moonshot V1 8K' },
+      { customModel: 'moonshot-v1-32k', actualModel: 'moonshot-v1-32k', description: 'Moonshot V1 32K' },
+      { customModel: 'moonshot-v1-128k', actualModel: 'moonshot-v1-128k', description: 'Moonshot V1 128K' },
+    ]
+  },
+  {
+    name: '阿里云百炼',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    description: '阿里云通义千问系列',
+    models: [
+      { customModel: 'qwen-turbo', actualModel: 'qwen-turbo', description: '通义千问 Turbo' },
+      { customModel: 'qwen-plus', actualModel: 'qwen-plus', description: '通义千问 Plus' },
+      { customModel: 'qwen-max', actualModel: 'qwen-max', description: '通义千问 Max' },
+    ]
+  },
+  {
+    name: 'MiniMax',
+    baseUrl: 'https://api.minimax.chat/v1',
+    description: 'MiniMax AI 服务',
+    models: [
+      { customModel: 'MiniMax-M2.5', actualModel: 'minimax/minimax-m2.5', description: 'MiniMax M2.5' },
+      { customModel: 'abab6.5-chat', actualModel: 'abab6.5-chat', description: 'ABAB 6.5 Chat' },
+      { customModel: 'abab5.5-chat', actualModel: 'abab5.5-chat', description: 'ABAB 5.5 Chat' },
+    ]
+  },
+  {
+    name: 'Anthropic',
+    baseUrl: 'https://api.anthropic.com/v1',
+    description: 'Anthropic Claude 系列',
+    models: [
+      { customModel: 'claude-3-opus', actualModel: 'claude-3-opus-20240229', description: 'Claude 3 Opus' },
+      { customModel: 'claude-3-sonnet', actualModel: 'claude-3-sonnet-20240229', description: 'Claude 3 Sonnet' },
+      { customModel: 'claude-3-haiku', actualModel: 'claude-3-haiku-20240307', description: 'Claude 3 Haiku' },
+    ]
+  },
+  {
+    name: 'Google AI',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    description: 'Google Gemini 系列',
+    models: [
+      { customModel: 'gemini-pro', actualModel: 'gemini-pro', description: 'Gemini Pro' },
+      { customModel: 'gemini-1.5-pro', actualModel: 'gemini-1.5-pro', description: 'Gemini 1.5 Pro' },
+      { customModel: 'gemini-1.5-flash', actualModel: 'gemini-1.5-flash', description: 'Gemini 1.5 Flash' },
+    ]
+  },
+];
 
 const SettingsPage: React.FC = () => {
   const [form] = Form.useForm();
@@ -51,9 +167,11 @@ const SettingsPage: React.FC = () => {
   const [modelMappings, setModelMappings] = useState<ModelMappingItem[]>([]);
   const [newCustomModel, setNewCustomModel] = useState('');
   const [newActualModel, setNewActualModel] = useState('');
+  const [newProvider, setNewProvider] = useState('');
   const [updateInfo, setUpdateInfo] = useState<{hasUpdate: boolean, currentVersion: string, latestVersion: string} | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<string>('');
   const { addNotification } = useNotification();
   
   const isProxyEnabled = Form.useWatch('enabled', form);
@@ -71,7 +189,8 @@ const SettingsPage: React.FC = () => {
               ([custom, actual], index) => ({
                 key: `mapping-${index}`,
                 customModel: custom,
-                actualModel: actual
+                actualModel: actual,
+                provider: ''
               })
             );
             setModelMappings(mappings);
@@ -113,6 +232,15 @@ const SettingsPage: React.FC = () => {
     }
   };
 
+  const handleProviderSelect = (providerName: string) => {
+    const provider = AI_PROVIDERS.find(p => p.name === providerName);
+    if (provider) {
+      form.setFieldsValue({ targetURL: provider.baseUrl });
+      setSelectedProvider(providerName);
+      addNotification(`已选择 ${provider.name}，地址: ${provider.baseUrl}`, 'success');
+    }
+  };
+
   const handleQuickConfig = (url: string) => {
     form.setFieldsValue({ targetURL: url });
   };
@@ -125,15 +253,53 @@ const SettingsPage: React.FC = () => {
     const newItem: ModelMappingItem = {
       key: `mapping-${Date.now()}`,
       customModel: newCustomModel.trim(),
-      actualModel: newActualModel.trim()
+      actualModel: newActualModel.trim(),
+      provider: newProvider.trim()
     };
     setModelMappings([...modelMappings, newItem]);
     setNewCustomModel('');
     setNewActualModel('');
+    setNewProvider('');
+  };
+
+  const handleQuickAddMappings = (provider: AIProvider) => {
+    const newMappings: ModelMappingItem[] = provider.models.map(model => ({
+      key: `mapping-${Date.now()}-${model.customModel}`,
+      customModel: model.customModel,
+      actualModel: model.actualModel,
+      provider: provider.name
+    }));
+    
+    const existingCustomModels = new Set(modelMappings.map(m => m.customModel));
+    const uniqueNewMappings = newMappings.filter(m => !existingCustomModels.has(m.customModel));
+    
+    if (uniqueNewMappings.length === 0) {
+      addNotification('所选服务商的模型映射已全部存在', 'info');
+      return;
+    }
+    
+    setModelMappings([...modelMappings, ...uniqueNewMappings]);
+    addNotification(`已添加 ${provider.name} 的 ${uniqueNewMappings.length} 个模型映射`, 'success');
   };
 
   const handleDeleteMapping = (key: string) => {
     setModelMappings(modelMappings.filter(item => item.key !== key));
+  };
+
+  const getProviderColor = (providerName: string): string => {
+    const colors: Record<string, string> = {
+      'OpenAI': 'green',
+      '飞牛云': 'blue',
+      '硅基流动': 'purple',
+      'DeepSeek': 'cyan',
+      '智谱AI': 'orange',
+      '月之暗面': 'magenta',
+      '阿里云百炼': 'gold',
+      'MiniMax': 'lime',
+      'Anthropic': 'volcano',
+      'Google AI': 'red',
+    };
+    return colors[providerName] || 'default';
   };
 
   const mappingColumns = [
@@ -141,13 +307,24 @@ const SettingsPage: React.FC = () => {
       title: '自定义模型名',
       dataIndex: 'customModel',
       key: 'customModel',
-      width: '45%',
+      width: '35%',
     },
     {
       title: '实际模型ID',
       dataIndex: 'actualModel',
       key: 'actualModel',
-      width: '45%',
+      width: '40%',
+    },
+    {
+      title: '服务商',
+      dataIndex: 'provider',
+      key: 'provider',
+      width: '15%',
+      render: (provider: string) => provider ? (
+        <Tag color={getProviderColor(provider)}>{provider}</Tag>
+      ) : (
+        <Text type="secondary">-</Text>
+      ),
     },
     {
       title: '操作',
@@ -254,10 +431,38 @@ const SettingsPage: React.FC = () => {
                   />
                 </Col>
 
+                <Col xs={24}>
+                  <Form.Item label={
+                    <Space>
+                      <span>选择服务商</span>
+                      <Tooltip title="选择服务商后，将自动填充对应的 API 地址">
+                        <InfoCircleOutlined style={{ color: '#999' }} />
+                      </Tooltip>
+                    </Space>
+                  }>
+                    <Select
+                      placeholder="选择 AI 服务商快速配置"
+                      onChange={handleProviderSelect}
+                      disabled={!isProxyEnabled}
+                      allowClear
+                      value={selectedProvider || undefined}
+                    >
+                      {AI_PROVIDERS.map(provider => (
+                        <Option key={provider.name} value={provider.name}>
+                          <Space>
+                            <Tag color={getProviderColor(provider.name)}>{provider.name}</Tag>
+                            <Text type="secondary" style={{ fontSize: 12 }}>{provider.description}</Text>
+                          </Space>
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+
                 <Col xs={24} md={16}>
                   <Form.Item label="目标API服务器地址" name="targetURL">
                     <Input 
-                      placeholder="例如: https://api.openai.com" 
+                      placeholder="例如: https://api.openai.com/v1" 
                       disabled={!isProxyEnabled}
                       prefix={<ApiOutlined />}
                     />
@@ -265,22 +470,19 @@ const SettingsPage: React.FC = () => {
                 </Col>
 
                 <Col xs={24} md={8}>
-                  <Form.Item label="快捷配置">
+                  <Form.Item label="常用地址">
                     <Space wrap>
-                      <Button 
-                        size="small"
-                        onClick={() => handleQuickConfig('https://api.openai.com')} 
-                        disabled={!isProxyEnabled}
-                      >
-                        OpenAI
-                      </Button>
-                      <Button 
-                        size="small"
-                        onClick={() => handleQuickConfig('https://api.deepseek.com')} 
-                        disabled={!isProxyEnabled}
-                      >
-                        Deepseek
-                      </Button>
+                      {AI_PROVIDERS.slice(0, 4).map(provider => (
+                        <Tooltip key={provider.name} title={provider.baseUrl}>
+                          <Button 
+                            size="small"
+                            onClick={() => handleQuickConfig(provider.baseUrl)} 
+                            disabled={!isProxyEnabled}
+                          >
+                            {provider.name}
+                          </Button>
+                        </Tooltip>
+                      ))}
                     </Space>
                   </Form.Item>
                 </Col>
@@ -344,6 +546,47 @@ const SettingsPage: React.FC = () => {
                 例如：将 <Text code>gpt-5.4</Text> 映射到 <Text code>abab6.5-chat</Text>
               </Paragraph>
 
+              <Card size="small" style={{ marginBottom: 16, background: '#fafafa' }}>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Text strong>
+                    <ThunderboltOutlined style={{ marginRight: 4, color: '#1890ff' }} />
+                    快捷添加模型映射
+                  </Text>
+                  <Space wrap>
+                    {AI_PROVIDERS.map(provider => (
+                      <Tooltip 
+                        key={provider.name} 
+                        title={
+                          <div>
+                            <div><strong>{provider.name}</strong> - {provider.description}</div>
+                            <div style={{ marginTop: 4 }}>
+                              {provider.models.slice(0, 3).map(m => (
+                                <div key={m.customModel}>
+                                  <Text code style={{ color: '#fff' }}>{m.customModel}</Text>
+                                  {' → '}
+                                  <Text code style={{ color: '#fff' }}>{m.actualModel}</Text>
+                                </div>
+                              ))}
+                              {provider.models.length > 3 && <Text style={{ color: '#fff' }}>...</Text>}
+                            </div>
+                          </div>
+                        }
+                      >
+                        <Button 
+                          size="small"
+                          onClick={() => handleQuickAddMappings(provider)}
+                          disabled={!isProxyEnabled}
+                        >
+                          <Tag color={getProviderColor(provider.name)} style={{ margin: 0 }}>
+                            {provider.name}
+                          </Tag>
+                        </Button>
+                      </Tooltip>
+                    ))}
+                  </Space>
+                </Space>
+              </Card>
+
               <div style={{ marginBottom: 16 }}>
                 <Space.Compact style={{ width: '100%' }}>
                   <Input
@@ -351,15 +594,31 @@ const SettingsPage: React.FC = () => {
                     value={newCustomModel}
                     onChange={(e) => setNewCustomModel(e.target.value)}
                     disabled={!isProxyEnabled}
-                    style={{ width: '40%' }}
+                    style={{ width: '30%' }}
                   />
                   <Input
                     placeholder="实际模型ID (如: abab6.5-chat)"
                     value={newActualModel}
                     onChange={(e) => setNewActualModel(e.target.value)}
                     disabled={!isProxyEnabled}
-                    style={{ width: '40%' }}
+                    style={{ width: '35%' }}
                   />
+                  <Select
+                    placeholder="服务商 (可选)"
+                    value={newProvider || undefined}
+                    onChange={setNewProvider}
+                    disabled={!isProxyEnabled}
+                    style={{ width: '20%' }}
+                    allowClear
+                  >
+                    {AI_PROVIDERS.map(provider => (
+                      <Option key={provider.name} value={provider.name}>
+                        <Tag color={getProviderColor(provider.name)} style={{ margin: 0 }}>
+                          {provider.name}
+                        </Tag>
+                      </Option>
+                    ))}
+                  </Select>
                   <Button
                     type="primary"
                     icon={<PlusOutlined />}
